@@ -141,3 +141,17 @@
   - Purpose 'assistants' is used for files referenced in Responses API calls
   - Wrap OpenAI calls in try/catch to avoid blocking the upload flow if API is unavailable
 ---
+
+## 2026-02-03 - US-011
+- Created `DocumentList` component showing filename, status badge, and file size
+- Created `Sidebar` client component wrapping UploadDropzone + DocumentList with refresh logic
+- Added `getDocuments(projectId)` server action
+- Created `GET /api/projects/[id]/documents` API route for client-side refresh
+- Added shadcn/ui Badge component for status display
+- Integrated Sidebar into workspace page with server-fetched initial documents
+- Browser verified: empty state shows correctly, dropzone + document list layout works
+- Files changed: src/components/documents/DocumentList.tsx, src/components/documents/Sidebar.tsx, src/app/api/projects/[id]/documents/route.ts, src/app/actions.ts, src/app/projects/[id]/page.tsx, src/components/ui/badge.tsx
+- **Learnings for future iterations:**
+  - Pattern: server component fetches initial data, passes to client component, client refreshes via API
+  - Sidebar client component manages document state and passes refresh callback to UploadDropzone
+---

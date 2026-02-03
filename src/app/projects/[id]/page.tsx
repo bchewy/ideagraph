@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getProject } from '@/app/actions';
-import { UploadDropzone } from '@/components/documents/UploadDropzone';
+import { getProject, getDocuments } from '@/app/actions';
+import { Sidebar } from '@/components/documents/Sidebar';
 
 export default async function ProjectWorkspace({
   params,
@@ -11,6 +11,8 @@ export default async function ProjectWorkspace({
   const { id } = await params;
   const project = await getProject(id);
   if (!project) notFound();
+
+  const docs = await getDocuments(id);
 
   return (
     <div className="flex h-screen flex-col">
@@ -28,10 +30,7 @@ export default async function ProjectWorkspace({
 
       <div className="flex flex-1 overflow-hidden">
         <aside className="w-64 shrink-0 border-r p-4 overflow-y-auto">
-          <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-            Documents
-          </h2>
-          <UploadDropzone projectId={id} />
+          <Sidebar projectId={id} initialDocuments={docs} />
         </aside>
 
         <main className="flex-1 bg-muted/30">
