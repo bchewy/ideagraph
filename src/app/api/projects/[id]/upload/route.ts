@@ -1,26 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { documents, projects } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
-import { randomUUID } from 'crypto';
+import { ConvexHttpClient } from 'convex/browser';
+import { api, type Id } from '@/lib/convex';
 import { writeFile, mkdir } from 'fs/promises';
 import { createReadStream } from 'fs';
 import path from 'path';
-import { openai } from '@/lib/openai/client';
+import OpenAI from 'openai';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
+function getConvexClient() {
+  return new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL as string);
+}
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: projectId } = await params;
+  const convex = getConvexClient();
 
-  const project = await db
-    .select()
-    .from(projects)
-    .where(eq(projects.id, projectId));
-  if (project.length === 0) {
+  // Validate project exists
+  const project = await convex.query(api.projects.get, {
+    id: projectId as Id<"projects">,
+  });
+  if (!project) {
     return NextResponse.json({ error: 'Project not found' }, { status: 404 });
   }
 
@@ -45,6 +48,7 @@ export async function POST(
     );
   }
 
+  // Save file to disk
   const uploadDir = path.join(process.cwd(), 'uploads', projectId);
   await mkdir(uploadDir, { recursive: true });
 
@@ -52,8 +56,10 @@ export async function POST(
   const filePath = path.join(uploadDir, file.name);
   await writeFile(filePath, buffer);
 
-  let openaiFileId: string | null = null;
+  // Upload to OpenAI Files API
+  let openaiFileId: string | undefined;
   try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const openaiFile = await openai.files.create({
       file: createReadStream(filePath),
       purpose: 'assistants',
@@ -63,17 +69,13 @@ export async function POST(
     console.error('OpenAI file upload failed:', err);
   }
 
-  const docId = randomUUID();
-  const now = Math.floor(Date.now() / 1000);
-
-  await db.insert(documents).values({
-    id: docId,
-    projectId,
+  // Create document record in Convex
+  const docId = await convex.mutation(api.documents.create, {
+    projectId: projectId as Id<"projects">,
     filename: file.name,
-    openaiFileId,
     status: 'uploaded',
     sizeBytes: file.size,
-    createdAt: now,
+    ...(openaiFileId ? { openaiFileId } : {}),
   });
 
   return NextResponse.json({

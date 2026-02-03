@@ -1,15 +1,14 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
+import type { Id } from '@/lib/convex';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 export function UploadDropzone({
   projectId,
-  onUploadComplete,
 }: {
-  projectId: string;
-  onUploadComplete?: () => void;
+  projectId: Id<"projects">;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -53,9 +52,9 @@ export function UploadDropzone({
 
       setProgress(`Uploaded ${pdfs.length} file(s).`);
       setUploading(false);
-      onUploadComplete?.();
+      // Document list auto-refreshes via Convex reactive query
     },
-    [projectId, onUploadComplete]
+    [projectId]
   );
 
   function handleDrop(e: React.DragEvent) {

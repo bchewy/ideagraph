@@ -1,43 +1,83 @@
-import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { CreateProjectDialog } from '@/components/CreateProjectDialog';
-import { getProjects } from './actions';
+'use client';
 
-export default async function Home() {
-  const projectList = await getProjects();
+import Link from 'next/link';
+import { useQuery } from 'convex/react';
+import { api } from '@/lib/convex';
+import { CreateProjectDialog } from '@/components/CreateProjectDialog';
+import { DeleteProjectButton } from '@/components/DeleteProjectButton';
+
+export default function Home() {
+  const projectList = useQuery(api.projects.list);
+
+  if (projectList === undefined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-3xl p-8">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">IdeaGraph</h1>
-          <p className="text-muted-foreground">
-            Extract ideas from PDFs and explore them as a knowledge graph.
-          </p>
-        </div>
-        <CreateProjectDialog />
-      </div>
+    <div className="min-h-screen flex flex-col">
+      {/* Header */}
+      <header className="flex items-center justify-between px-8 py-6 border-b border-border">
+        <h1 className="text-sm font-medium tracking-wide">IdeaGraph</h1>
+      </header>
 
-      {projectList.length === 0 ? (
-        <p className="text-center text-muted-foreground py-12">
-          No projects yet. Create one to get started.
-        </p>
-      ) : (
-        <div className="grid gap-4">
-          {projectList.map((project) => (
-            <Link key={project.id} href={`/projects/${project.id}`}>
-              <Card className="transition-colors hover:bg-muted/50">
-                <CardHeader>
-                  <CardTitle>{project.name}</CardTitle>
-                  <CardDescription>
-                    Created {new Date(project.createdAt * 1000).toLocaleDateString()}
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
-          ))}
+      <main className="flex-1 flex flex-col items-center justify-center px-8">
+        <div className="w-full max-w-lg">
+          {/* Title area */}
+          <div className="mb-12 text-center">
+            <h2 className="text-3xl font-light tracking-tight mb-3">
+              Your ideas, connected.
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Upload PDFs. Extract ideas. See how they relate.
+            </p>
+          </div>
+
+          {/* New project */}
+          <div className="mb-10 flex justify-center">
+            <CreateProjectDialog />
+          </div>
+
+          {/* Project list */}
+          {projectList.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground">
+              No projects yet.
+            </p>
+          ) : (
+            <div className="border-t border-border">
+              {projectList.map((project) => (
+                <div
+                  key={project._id}
+                  className="group flex items-center justify-between border-b border-border"
+                >
+                  <Link
+                    href={`/projects/${project._id}`}
+                    className="flex-1 py-4 flex items-baseline justify-between pr-4 hover:opacity-60 transition-opacity"
+                  >
+                    <span className="text-sm font-medium">{project.name}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {new Date(project._creationTime).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </span>
+                  </Link>
+                  <DeleteProjectButton projectId={project._id} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </main>
+
+      <footer className="px-8 py-6 text-center">
+        <p className="text-xs text-muted-foreground">
+          Powered by GPT · {projectList.length} project{projectList.length !== 1 ? 's' : ''}
+        </p>
+      </footer>
     </div>
   );
 }

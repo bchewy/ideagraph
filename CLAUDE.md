@@ -10,14 +10,15 @@ IdeaGraph is a knowledge graph application that extracts ideas from PDFs using O
 
 - **Framework:** Next.js 16 (App Router) with TypeScript
 - **UI:** Tailwind CSS + shadcn/ui
-- **Database:** SQLite via Drizzle ORM (better-sqlite3)
-- **AI:** OpenAI SDK — GPT-5.2 (Structured Outputs), text-embedding-3-large
-- **Graph:** React Flow (visualization), Dagre (layout)
+- **Database:** Convex (cloud backend + reactive database)
+- **AI:** OpenAI SDK — GPT-4.1 (Structured Outputs), text-embedding-3-large
+- **Graph:** React Flow (visualization), custom grid layout
 
 ## Commands
 
 ```bash
-npm run dev          # Start dev server
+npm run dev          # Start Next.js dev server
+npx convex dev       # Start Convex dev sync (run in parallel)
 npm run build        # Production build
 npm run typecheck    # TypeScript type checking (npx tsc --noEmit)
 npm run lint         # ESLint
@@ -27,35 +28,36 @@ npm run lint         # ESLint
 
 ### Processing Pipeline
 
-1. **Upload** — PDFs saved to `uploads/{projectId}/` and uploaded to OpenAI Files API
-2. **Extract** — GPT-5.2 with Structured Outputs extracts ideas (max 30 per doc) → creates nodes + evidenceRefs
-3. **Link** — Generate embeddings → cosine similarity pairs (>0.4 threshold, deduplicate ≥0.88) → GPT classifies relationships → creates edges
-4. All long-running operations use a job-based async pattern: endpoint returns `{ jobId }`, frontend polls `/api/jobs/[id]` every 2s
+1. **Upload** — PDFs saved to `uploads/{projectId}/` and uploaded to OpenAI Files API (Next.js API route → Convex mutation)
+2. **Extract** — Convex action calls GPT-4.1 with Structured Outputs to extract ideas (max 30 per doc) → creates nodes + evidenceRefs
+3. **Link** — Convex action generates embeddings → cosine similarity pairs (>0.4 threshold, deduplicate ≥0.88) → GPT classifies relationships → creates edges
+4. Long-running operations use Convex's mutation → scheduler → action pattern. Frontend subscribes to job status reactively via `useQuery` (no polling).
 
 ### Key Paths
 
-- `src/lib/db/schema.ts` — Drizzle schema (projects, documents, nodes, edges, evidenceRefs, jobs)
-- `src/lib/db/index.ts` — Database connection
-- `src/lib/openai/client.ts` — OpenAI client
-- `src/lib/openai/extract.ts` — Idea extraction pipeline
-- `src/lib/openai/embeddings.ts` — Embedding generation
-- `src/lib/openai/link.ts` — Relationship classification
-- `src/lib/graph/layout.ts` — Dagre layout
+- `convex/schema.ts` — Convex schema (projects, documents, nodes, edges, evidenceRefs, jobs)
+- `convex/projects.ts` — Project CRUD (queries + mutations)
+- `convex/documents.ts` — Document queries + mutations
+- `convex/graph.ts` — Graph data query (nodes + edges + evidence)
+- `convex/jobs.ts` — Job status query + internal mutations
+- `convex/extraction.ts` — Idea extraction (mutation + Node.js action calling OpenAI)
+- `convex/linking.ts` — Relationship linking (mutation + Node.js action calling OpenAI)
+- `src/lib/convex.ts` — Re-exports `api` and types from Convex generated code
+- `src/lib/graph/layout.ts` — Document-grouped grid layout (runs client-side)
+- `src/app/ConvexClientProvider.tsx` — Convex React provider
 - `src/components/graph/` — GraphCanvas, IdeaNode, RelationshipEdge
 - `src/components/inspector/` — NodeInspector, EdgeInspector
-- `src/components/documents/` — DocumentList, UploadDropzone
+- `src/components/documents/` — DocumentList, UploadDropzone, Sidebar
 
 ### API Routes
 
-- `POST /api/projects/[id]/upload` — Multipart PDF upload
-- `POST /api/projects/[id]/extract` — Trigger idea extraction (returns jobId)
-- `POST /api/projects/[id]/link` — Trigger relationship linking (returns jobId)
-- `GET /api/projects/[id]/graph` — Fetch full graph (nodes + edges + evidence)
-- `GET /api/jobs/[id]` — Poll job status
+- `POST /api/projects/[id]/upload` — Multipart PDF upload (only remaining Next.js API route)
 
-### Database Schema
+All other data operations use Convex functions directly from the frontend via `useQuery`/`useMutation`.
 
-Six tables: `projects`, `documents`, `nodes`, `edges`, `evidenceRefs`, `jobs`. All IDs are text (UUIDs). Timestamps are integers (Unix epoch). Tags and embeddings stored as JSON text in SQLite.
+### Database Schema (Convex)
+
+Six tables: `projects`, `documents`, `nodes`, `edges`, `evidenceRefs`, `jobs`. IDs are Convex-generated (`Id<"tableName">`). Timestamps use `_creationTime` (auto). Tags are native `string[]`, embeddings are native `float64[]`.
 
 ### Edge Types
 
@@ -63,8 +65,11 @@ Six tables: `projects`, `documents`, `nodes`, `edges`, `evidenceRefs`, `jobs`. A
 
 ## Environment
 
-Requires `OPENAI_API_KEY` in `.env.local`. See `.env.local.example`.
+Requires in `.env.local`:
+- `OPENAI_API_KEY` — for upload route and Convex actions
+- `CONVEX_DEPLOYMENT` — set by `npx convex dev`
+- `NEXT_PUBLIC_CONVEX_URL` — set by `npx convex dev`
 
-## Ralph Agent System
+Also set in Convex cloud: `npx convex env set OPENAI_API_KEY <key>`
 
-This repo uses an autonomous agent loop (`ralph.sh`) that implements user stories from `tasks.json` one at a time. Progress is tracked in `progress.txt`. Read the Codebase Patterns section at the top of `progress.txt` before starting work.
+See `.env.local.example`.

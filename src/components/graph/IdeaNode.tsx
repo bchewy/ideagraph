@@ -1,5 +1,4 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Badge } from '@/components/ui/badge';
 
 type IdeaNodeData = {
   label: string;
@@ -9,47 +8,30 @@ type IdeaNodeData = {
 };
 
 export function IdeaNode({ data }: NodeProps) {
-  const { label, tags, sources } = data as IdeaNodeData;
-
-  const uniqueFilenames = [...new Set(sources.map((s) => s.filename))];
+  const { label, tags } = data as IdeaNodeData;
 
   return (
     <>
-      <Handle type="target" position={Position.Top} />
-      <div className="min-w-[180px] max-w-[260px] rounded-lg border border-border bg-card px-3 py-2 shadow-md">
-        <p className="text-sm font-semibold leading-snug text-card-foreground">
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="!bg-white/30 !border-white/10 !w-1.5 !h-1.5"
+      />
+      <div className="w-[200px] rounded border border-white/[0.08] bg-[#0c0c0c] px-3 py-2 transition-colors hover:border-white/20">
+        <p className="text-[11px] font-medium leading-snug text-foreground line-clamp-2">
           {label}
         </p>
-
         {tags.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {tags.map((tag) => (
-              <Badge
-                key={tag}
-                variant="secondary"
-                className="text-[10px] px-1.5 py-0"
-              >
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        )}
-
-        {uniqueFilenames.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {uniqueFilenames.map((filename) => (
-              <Badge
-                key={filename}
-                variant="outline"
-                className="text-[10px] px-1.5 py-0"
-              >
-                {filename}
-              </Badge>
-            ))}
-          </div>
+          <p className="mt-1 text-[10px] text-muted-foreground truncate">
+            {tags.map((t) => `#${t}`).join(' ')}
+          </p>
         )}
       </div>
-      <Handle type="source" position={Position.Bottom} />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!bg-white/30 !border-white/10 !w-1.5 !h-1.5"
+      />
     </>
   );
 }

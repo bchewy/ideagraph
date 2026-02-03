@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -11,26 +12,22 @@ import {
 type RelationshipEdgeData = {
   relType: string;
   confidence: number;
+  showLabel?: boolean;
   evidence: { documentId: string; filename: string; excerpt: string }[];
 };
 
 type RelationshipEdge = Edge<RelationshipEdgeData, 'relationship'>;
 
 const EDGE_COLORS: Record<string, string> = {
-  supports: '#22c55e',
-  contradicts: '#ef4444',
-  extends: '#3b82f6',
-  similar: '#a855f7',
-  example_of: '#f97316',
-  depends_on: '#14b8a6',
+  supports: '#4ade80',
+  contradicts: '#f87171',
+  extends: '#60a5fa',
+  similar: '#c084fc',
+  example_of: '#fb923c',
+  depends_on: '#2dd4bf',
 };
 
-const DEFAULT_EDGE_COLOR = '#6b7280';
-
-function getEdgeColor(relType: string | undefined): string {
-  if (!relType) return DEFAULT_EDGE_COLOR;
-  return EDGE_COLORS[relType] ?? DEFAULT_EDGE_COLOR;
-}
+const DEFAULT_COLOR = '#555555';
 
 function formatLabel(relType: string | undefined): string {
   if (!relType) return '';
@@ -49,6 +46,8 @@ export function RelationshipEdge({
   markerEnd,
   style,
 }: EdgeProps<RelationshipEdge>) {
+  const [hovered, setHovered] = useState(false);
+
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -58,26 +57,42 @@ export function RelationshipEdge({
     targetPosition,
   });
 
-  const color = getEdgeColor(data?.relType);
+  const color = EDGE_COLORS[data?.relType ?? ''] ?? DEFAULT_COLOR;
   const label = formatLabel(data?.relType);
+  const showLabel = hovered || data?.showLabel;
 
   return (
     <>
+      {/* Invisible wider hit area for hover */}
+      <path
+        d={edgePath}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={16}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{ cursor: 'pointer' }}
+      />
       <BaseEdge
         id={id}
         path={edgePath}
         markerEnd={markerEnd}
-        style={{ ...style, stroke: color, strokeWidth: 2 }}
+        style={{
+          ...style,
+          stroke: color,
+          strokeWidth: hovered ? 2 : 1.5,
+          transition: 'opacity 0.15s, stroke-width 0.15s',
+        }}
       />
-      {label && (
+      {showLabel && label && (
         <EdgeLabelRenderer>
           <div
             style={{
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-              pointerEvents: 'all',
+              pointerEvents: 'none',
             }}
-            className="nodrag nopan rounded-full border bg-background px-2 py-0.5 text-xs font-medium"
+            className="rounded-sm border border-border bg-card px-2 py-0.5 text-[10px] font-medium"
           >
             <span style={{ color }}>{label}</span>
           </div>

@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Sidebar } from '@/components/documents/Sidebar';
 import {
   GraphCanvas,
-  type GraphCanvasHandle,
   type GraphFilters,
   type GraphMetadata,
 } from '@/components/graph/GraphCanvas';
@@ -12,13 +12,7 @@ import { NodeInspector, type NodeInspectorData } from '@/components/inspector/No
 import { EdgeInspector } from '@/components/inspector/EdgeInspector';
 import { ExportButton } from '@/components/graph/ExportButton';
 import { FilterPanel } from '@/components/graph/FilterPanel';
-
-type Document = {
-  id: string;
-  filename: string;
-  status: string;
-  sizeBytes: number;
-};
+import type { Id } from '@/lib/convex';
 
 type EdgeData = {
   relType: string;
@@ -29,13 +23,11 @@ type EdgeData = {
 export function WorkspaceClient({
   projectId,
   projectName,
-  initialDocuments,
 }: {
-  projectId: string;
+  projectId: Id<"projects">;
   projectName: string;
-  initialDocuments: Document[];
 }) {
-  const graphRef = useRef<GraphCanvasHandle>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedNode, setSelectedNode] = useState<NodeInspectorData | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<EdgeData | null>(null);
   const [filters, setFilters] = useState<GraphFilters>({
@@ -54,25 +46,44 @@ export function WorkspaceClient({
 
   return (
     <div className="flex flex-1 overflow-hidden">
-      <aside className="w-64 shrink-0 border-r p-4 overflow-y-auto">
-        <Sidebar
-          projectId={projectId}
-          initialDocuments={initialDocuments}
-          onGraphRefresh={() => graphRef.current?.refresh()}
-        />
-        <div className="mt-4 space-y-3">
-          <FilterPanel
-            documents={graphMeta.documents}
-            edgeTypes={graphMeta.edgeTypes}
-            onFilterChange={setFilters}
-          />
-          <ExportButton projectId={projectId} projectName={projectName} />
+      {/* Sidebar */}
+      {sidebarOpen ? (
+        <aside className="w-64 shrink-0 border-r border-border flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-4 pt-4 pb-2">
+            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Panel</span>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <PanelLeftClose className="size-3.5" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 pb-4">
+            <Sidebar projectId={projectId} />
+            <div className="mt-6 space-y-3">
+              <FilterPanel
+                documents={graphMeta.documents}
+                edgeTypes={graphMeta.edgeTypes}
+                onFilterChange={setFilters}
+              />
+              <ExportButton projectId={projectId} projectName={projectName} />
+            </div>
+          </div>
+        </aside>
+      ) : (
+        <div className="shrink-0 border-r border-border flex flex-col items-center py-3 px-1.5">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <PanelLeftOpen className="size-3.5" />
+          </button>
         </div>
-      </aside>
+      )}
 
-      <main className="flex-1">
+      {/* Graph */}
+      <main className="flex-1 relative">
         <GraphCanvas
-          ref={graphRef}
           projectId={projectId}
           filters={filters}
           onNodeClick={(data) => {
@@ -87,6 +98,7 @@ export function WorkspaceClient({
         />
       </main>
 
+      {/* Inspectors */}
       {selectedNode && (
         <NodeInspector
           data={selectedNode}
@@ -95,7 +107,7 @@ export function WorkspaceClient({
       )}
 
       {selectedEdge && (
-        <aside className="w-80 shrink-0">
+        <aside className="w-72 shrink-0">
           <EdgeInspector
             edge={selectedEdge}
             onClose={() => setSelectedEdge(null)}

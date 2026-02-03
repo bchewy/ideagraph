@@ -1,70 +1,46 @@
 'use client';
 
-import { useState } from 'react';
+import { useQuery } from 'convex/react';
+import { api, type Id } from '@/lib/convex';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type ExportButtonProps = {
-  projectId: string;
+  projectId: Id<"projects">;
   projectName: string;
 };
 
-function formatDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function sanitizeFilename(name: string): string {
-  return name.replace(/[^a-zA-Z0-9_-]/g, '_');
-}
-
-function triggerDownload(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
-}
-
 export function ExportButton({ projectId, projectName }: ExportButtonProps): React.JSX.Element {
-  const [exporting, setExporting] = useState(false);
+  const graph = useQuery(api.graph.get, { projectId });
 
-  async function handleExport(): Promise<void> {
-    setExporting(true);
-    try {
-      const response = await fetch(`/api/projects/${projectId}/graph`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch graph data: ${response.status}`);
-      }
+  function handleExport(): void {
+    if (!graph) return;
+    const json = JSON.stringify(graph, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
 
-      const data: unknown = await response.json();
-      const json = JSON.stringify(data, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
+    const safeName = projectName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const date = new Date().toISOString().split('T')[0];
+    const filename = `${safeName}-graph-${date}.json`;
 
-      const safeName = sanitizeFilename(projectName);
-      const filename = `${safeName}-graph-${formatDate(new Date())}.json`;
-      triggerDownload(blob, filename);
-    } catch (error) {
-      console.error('Export failed:', error);
-    } finally {
-      setExporting(false);
-    }
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
   }
 
   return (
     <Button
       variant="outline"
       size="sm"
-      disabled={exporting}
+      disabled={!graph}
       onClick={handleExport}
     >
       <Download />
-      {exporting ? 'Exporting...' : 'Export JSON'}
+      Export JSON
     </Button>
   );
 }

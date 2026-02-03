@@ -1,87 +1,123 @@
-const NODE_WIDTH = 200;
-const NODE_HEIGHT = 80;
-const NODE_SEP = 60;
-const RANK_SEP = 80;
+const NODE_WIDTH = 220;
+const NODE_HEIGHT = 70;
+const NODE_GAP_X = 60;
+const NODE_GAP_Y = 50;
+const GROUP_PADDING = 50;
+const GROUP_HEADER = 56;
+const GROUP_GAP = 180;
 
-type LayoutNode = { id: string };
+type LayoutNode = { id: string; documentId?: string };
 type LayoutEdge = { source: string; target: string };
 
+export type GroupBox = {
+  documentId: string;
+  filename: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+/**
+ * Document-grouped layout.
+ *
+ * Nodes are arranged in a grid within their document group rectangle.
+ * Groups are placed side by side. Cross-document edges still connect.
+ */
 export function computeLayout(
   nodes: LayoutNode[],
-  edges: LayoutEdge[]
-): Map<string, { x: number; y: number }> {
+  _edges: LayoutEdge[],
+): { positions: Map<string, { x: number; y: number }>; groups: GroupBox[] } {
   const positions = new Map<string, { x: number; y: number }>();
-  if (nodes.length === 0) return positions;
+  const groups: GroupBox[] = [];
 
-  const nodeIds = new Set(nodes.map((n) => n.id));
-  const children = new Map<string, string[]>();
-  const inDegree = new Map<string, number>();
+  if (nodes.length === 0) return { positions, groups };
 
-  for (const id of nodeIds) {
-    children.set(id, []);
-    inDegree.set(id, 0);
-  }
+  // Group nodes by document
+  const docGroups = new Map<string, { filename: string; nodes: LayoutNode[] }>();
+  const ungrouped: LayoutNode[] = [];
 
-  for (const e of edges) {
-    if (nodeIds.has(e.source) && nodeIds.has(e.target)) {
-      children.get(e.source)!.push(e.target);
-      inDegree.set(e.target, (inDegree.get(e.target) ?? 0) + 1);
-    }
-  }
-
-  const rank = new Map<string, number>();
-  const queue: string[] = [];
-
-  for (const id of nodeIds) {
-    if ((inDegree.get(id) ?? 0) === 0) {
-      queue.push(id);
-      rank.set(id, 0);
-    }
-  }
-
-  let head = 0;
-  while (head < queue.length) {
-    const id = queue[head++];
-    const r = rank.get(id)!;
-    for (const child of children.get(id) ?? []) {
-      const prev = rank.get(child);
-      const next = r + 1;
-      if (prev === undefined || next > prev) {
-        rank.set(child, next);
+  for (const node of nodes) {
+    if (node.documentId) {
+      if (!docGroups.has(node.documentId)) {
+        docGroups.set(node.documentId, {
+          filename: node.documentId, // will be overwritten with real filename
+          nodes: [],
+        });
       }
-      const remaining = (inDegree.get(child) ?? 1) - 1;
-      inDegree.set(child, remaining);
-      if (remaining === 0) {
-        queue.push(child);
-      }
+      docGroups.get(node.documentId)!.nodes.push(node);
+    } else {
+      ungrouped.push(node);
     }
   }
 
-  for (const id of nodeIds) {
-    if (!rank.has(id)) rank.set(id, 0);
-  }
+  // Determine columns per group — aim for roughly 3-4 columns
+  function layoutGroup(groupNodes: LayoutNode[], offsetX: number, offsetY: number) {
+    const n = groupNodes.length;
+    const cols = Math.min(3, Math.max(2, Math.ceil(Math.sqrt(n))));
+    const rows = Math.ceil(n / cols);
 
-  const ranks = new Map<number, string[]>();
-  for (const [id, r] of rank) {
-    if (!ranks.has(r)) ranks.set(r, []);
-    ranks.get(r)!.push(id);
-  }
-
-  const sortedRanks = [...ranks.keys()].sort((a, b) => a - b);
-
-  for (const r of sortedRanks) {
-    const layer = ranks.get(r)!;
-    const totalWidth = layer.length * NODE_WIDTH + (layer.length - 1) * NODE_SEP;
-    const startX = -totalWidth / 2;
-    const y = r * (NODE_HEIGHT + RANK_SEP);
-
-    for (let i = 0; i < layer.length; i++) {
-      positions.set(layer[i], {
-        x: startX + i * (NODE_WIDTH + NODE_SEP),
-        y,
+    for (let i = 0; i < n; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      positions.set(groupNodes[i].id, {
+        x: offsetX + GROUP_PADDING + col * (NODE_WIDTH + NODE_GAP_X),
+        y: offsetY + GROUP_HEADER + GROUP_PADDING + row * (NODE_HEIGHT + NODE_GAP_Y),
       });
     }
+
+    const actualCols = Math.min(cols, n);
+    const width = GROUP_PADDING * 2 + actualCols * NODE_WIDTH + (actualCols - 1) * NODE_GAP_X;
+    const height = GROUP_HEADER + GROUP_PADDING * 2 + rows * NODE_HEIGHT + (rows - 1) * NODE_GAP_Y;
+    return { width, height };
   }
 
-  return positions;
+  let cursorX = 0;
+  const sortedGroups = [...docGroups.entries()].sort(
+    (a, b) => b[1].nodes.length - a[1].nodes.length,
+  );
+
+  for (const [docId, group] of sortedGroups) {
+    const { width, height } = layoutGroup(group.nodes, cursorX, 0);
+    groups.push({
+      documentId: docId,
+      filename: group.filename,
+      x: cursorX,
+      y: 0,
+      width,
+      height,
+    });
+    cursorX += width + GROUP_GAP;
+  }
+
+  // Ungrouped nodes go in their own section
+  if (ungrouped.length > 0) {
+    const { width, height } = layoutGroup(ungrouped, cursorX, 0);
+    groups.push({
+      documentId: '__ungrouped',
+      filename: 'Other',
+      x: cursorX,
+      y: 0,
+      width,
+      height,
+    });
+    cursorX += width + GROUP_GAP;
+  }
+
+  // Center everything
+  const totalWidth = cursorX - GROUP_GAP;
+  const offsetX = -totalWidth / 2;
+  const maxH = Math.max(...groups.map((g) => g.height), 0);
+  const offsetY = -maxH / 2;
+
+  for (const pos of positions.values()) {
+    pos.x += offsetX;
+    pos.y += offsetY;
+  }
+  for (const g of groups) {
+    g.x += offsetX;
+    g.y += offsetY;
+  }
+
+  return { positions, groups };
 }

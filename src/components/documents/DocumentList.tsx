@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 
 type Document = {
-  id: string;
+  _id: string;
   filename: string;
   status: string;
   sizeBytes: number;
@@ -32,7 +32,7 @@ export function DocumentList({ documents }: { documents: Document[] }) {
     <ul className="space-y-2">
       {documents.map((doc) => (
         <li
-          key={doc.id}
+          key={doc._id}
           className="rounded-md border p-2 text-sm"
         >
           <div className="flex items-start justify-between gap-2">

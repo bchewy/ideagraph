@@ -1,136 +1,251 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery, useMutation } from 'convex/react';
+import { api, type Id } from '@/lib/convex';
 import { UploadDropzone } from './UploadDropzone';
 import { DocumentList } from './DocumentList';
 import { Button } from '@/components/ui/button';
+import { Sparkles, Link2, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 
-type Document = {
-  id: string;
-  filename: string;
-  status: string;
-  sizeBytes: number;
-};
+export function Sidebar({ projectId }: { projectId: Id<"projects"> }) {
+  const documents = useQuery(api.documents.list, { projectId });
+  const startExtraction = useMutation(api.extraction.start);
+  const startLinkingMutation = useMutation(api.linking.start);
 
-type JobStatus = {
-  id: string;
-  status: string;
-  type: string;
-  error: string | null;
-};
+  const [extractionJobId, setExtractionJobId] = useState<Id<"jobs"> | null>(null);
+  const [linkingJobId, setLinkingJobId] = useState<Id<"jobs"> | null>(null);
 
-export function Sidebar({
-  projectId,
-  initialDocuments,
-  onGraphRefresh,
-}: {
-  projectId: string;
-  initialDocuments: Document[];
-  onGraphRefresh?: () => void;
-}) {
-  const [documents, setDocuments] = useState<Document[]>(initialDocuments);
-  const [job, setJob] = useState<JobStatus | null>(null);
-  const [extracting, setExtracting] = useState(false);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const latestLinkingJob = useQuery(api.jobs.getLatestByType, {
+    projectId,
+    type: 'linking',
+    statuses: ['pending', 'running'],
+  });
 
-  const refreshDocuments = useCallback(async () => {
-    const res = await fetch(`/api/projects/${projectId}/documents`);
-    if (res.ok) {
-      const data = await res.json();
-      setDocuments(data);
+  // Reactive job status — no polling needed!
+  const extractionJob = useQuery(
+    api.jobs.get,
+    extractionJobId ? { id: extractionJobId } : "skip"
+  );
+  const linkingJob = useQuery(
+    api.jobs.get,
+    linkingJobId ? { id: linkingJobId } : "skip"
+  );
+
+  useEffect(() => {
+    if (!linkingJobId && latestLinkingJob?._id) {
+      setLinkingJobId(latestLinkingJob._id);
     }
-  }, [projectId]);
+  }, [latestLinkingJob, linkingJobId]);
 
+  const extracting =
+    extractionJobId !== null &&
+    (extractionJob?.status === "pending" || extractionJob?.status === "running");
+  const linking =
+    linkingJobId !== null &&
+    (linkingJob?.status === "pending" || linkingJob?.status === "running");
+  const isBusy = extracting || linking;
+
+  // Auto-trigger linking after extraction completes (only for this session)
+  const prevExtractionStatus = useRef<string | undefined>(undefined);
   useEffect(() => {
-    setDocuments(initialDocuments);
-  }, [initialDocuments]);
-
-  useEffect(() => {
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
-  }, []);
-
-  async function pollJob(jobId: string) {
-    pollingRef.current = setInterval(async () => {
-      const res = await fetch(`/api/jobs/${jobId}`);
-      if (!res.ok) return;
-      const data: JobStatus = await res.json();
-      setJob(data);
-
-      if (data.status === 'completed' || data.status === 'failed') {
-        if (pollingRef.current) clearInterval(pollingRef.current);
-        pollingRef.current = null;
-        setExtracting(false);
-        await refreshDocuments();
-        if (data.status === 'completed') {
-          onGraphRefresh?.();
-        }
-      }
-    }, 2000);
-  }
+    if (
+      prevExtractionStatus.current !== "completed" &&
+      extractionJob?.status === "completed" &&
+      !linkingJobId
+    ) {
+      handleStartLinking();
+    }
+    prevExtractionStatus.current = extractionJob?.status;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extractionJob?.status]);
 
   async function handleExtract() {
-    const uploadedDocs = documents.filter((d) => d.status === 'uploaded');
+    const uploadedDocs = (documents ?? []).filter((d) => d.status === "uploaded");
     if (uploadedDocs.length === 0) return;
 
-    setExtracting(true);
-    setJob(null);
-
-    const res = await fetch(`/api/projects/${projectId}/extract`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ documentIds: uploadedDocs.map((d) => d.id) }),
+    setLinkingJobId(null);
+    const jobId = await startExtraction({
+      projectId,
+      documentIds: uploadedDocs.map((d) => d._id),
     });
-
-    if (!res.ok) {
-      setExtracting(false);
-      setJob({ id: '', status: 'failed', type: 'extraction', error: 'Failed to start extraction' });
-      return;
-    }
-
-    const { jobId } = await res.json();
-    setJob({ id: jobId, status: 'pending', type: 'extraction', error: null });
-    pollJob(jobId);
+    setExtractionJobId(jobId);
   }
 
-  const uploadedCount = documents.filter((d) => d.status === 'uploaded').length;
+  async function handleStartLinking() {
+    const jobId = await startLinkingMutation({ projectId });
+    setLinkingJobId(jobId);
+  }
+
+  const uploadedCount = (documents ?? []).filter((d) => d.status === "uploaded").length;
+  const extractedCount = (documents ?? []).filter((d) => d.status === "extracted").length;
 
   return (
     <>
-      <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Documents
       </h2>
-      <UploadDropzone projectId={projectId} onUploadComplete={refreshDocuments} />
+      <UploadDropzone projectId={projectId} />
       <div className="mt-4">
-        <DocumentList documents={documents} />
+        <DocumentList documents={documents ?? []} />
       </div>
 
-      {uploadedCount > 0 && !extracting && (
-        <Button onClick={handleExtract} className="mt-4 w-full" size="sm">
+      {/* Extract button */}
+      {uploadedCount > 0 && !isBusy && (
+        <Button onClick={handleExtract} className="mt-4 w-full gap-2" size="sm">
+          <Sparkles className="size-3.5" />
           Extract Ideas ({uploadedCount})
         </Button>
       )}
 
-      {extracting && job && (
-        <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-          <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          <span>
-            {job.status === 'pending' && 'Starting extraction...'}
-            {job.status === 'running' && 'Extracting ideas...'}
-          </span>
-        </div>
+      {/* Link button (manual) */}
+      {!isBusy && extractedCount > 0 && uploadedCount === 0 && !linkingJob && (
+        <Button onClick={handleStartLinking} variant="outline" className="mt-4 w-full gap-2" size="sm">
+          <Link2 className="size-3.5" />
+          Link Ideas
+        </Button>
       )}
 
-      {!extracting && job?.status === 'completed' && (
-        <p className="mt-4 text-sm text-green-600">Extraction complete.</p>
+      {/* Re-link button */}
+      {!isBusy && linkingJob?.status === "completed" && (
+        <Button onClick={handleStartLinking} variant="outline" className="mt-3 w-full gap-2" size="sm">
+          <Link2 className="size-3.5" />
+          Re-link Ideas
+        </Button>
       )}
 
-      {!extracting && job?.status === 'failed' && (
-        <p className="mt-4 text-sm text-red-600">
-          Extraction failed: {job.error}
-        </p>
-      )}
+      {/* Status messages */}
+      <div className="mt-4 space-y-2">
+        {extracting && extractionJob && (
+          <div className="rounded-lg border border-border/60 bg-card/30 px-3 py-2.5 space-y-2">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin text-primary shrink-0" />
+              <span>
+                {extractionJob.progressMessage ??
+                  (extractionJob.status === "pending"
+                    ? "Starting extraction..."
+                    : "Extracting ideas...")}
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            {extractionJob.progressTotal != null &&
+              extractionJob.progressTotal > 0 && (
+                <div className="space-y-1">
+                  <div className="h-1.5 w-full rounded-full bg-muted/40 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
+                      style={{
+                        width: `${Math.round(
+                          ((extractionJob.progressCurrent ?? 0) /
+                            extractionJob.progressTotal) *
+                            100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[11px] text-muted-foreground/70">
+                    <span>
+                      {extractionJob.progressCurrent ?? 0} / {extractionJob.progressTotal} docs
+                    </span>
+                    {(extractionJob.ideasExtracted ?? 0) > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="size-3" />
+                        {extractionJob.ideasExtracted} idea{extractionJob.ideasExtracted === 1 ? "" : "s"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+          </div>
+        )}
+
+        {!extracting && extractionJob?.status === "completed" && (
+          <div className="rounded-lg border border-green-500/20 bg-green-500/5 px-3 py-2.5 space-y-1">
+            <div className="flex items-center gap-2 text-sm text-green-400">
+              <CheckCircle2 className="size-3.5" />
+              Extraction complete
+            </div>
+            {extractionJob.progressMessage && (
+              <p className="text-[11px] text-green-400/70 pl-5.5">
+                {extractionJob.progressMessage}
+              </p>
+            )}
+          </div>
+        )}
+
+        {!extracting && extractionJob?.status === "failed" && (
+          <div className="flex items-center gap-2 text-sm text-red-400 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
+            <XCircle className="size-3.5" />
+            <span className="truncate">Extraction failed: {extractionJob.error}</span>
+          </div>
+        )}
+
+        {linking && linkingJob && (
+          <div className="rounded-lg border border-border/60 bg-card/30 px-3 py-2.5 space-y-2">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin text-primary shrink-0" />
+              <span>
+                {linkingJob.progressMessage ??
+                  (linkingJob.status === "pending"
+                    ? "Starting linking..."
+                    : "Linking ideas...")}
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            {linkingJob.progressTotal != null &&
+              linkingJob.progressTotal > 0 && (
+                <div className="space-y-1">
+                  <div className="h-1.5 w-full rounded-full bg-muted/40 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
+                      style={{
+                        width: `${Math.round(
+                          ((linkingJob.progressCurrent ?? 0) /
+                            linkingJob.progressTotal) *
+                            100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[11px] text-muted-foreground/70">
+                    <span>
+                      {linkingJob.progressCurrent ?? 0} / {linkingJob.progressTotal} batch{linkingJob.progressTotal === 1 ? "" : "es"}
+                    </span>
+                    {(linkingJob.linksCreated ?? 0) > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Link2 className="size-3" />
+                        {linkingJob.linksCreated} link{linkingJob.linksCreated === 1 ? "" : "s"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+          </div>
+        )}
+
+        {!linking && linkingJob?.status === "completed" && (
+          <div className="rounded-lg border border-green-500/20 bg-green-500/5 px-3 py-2.5 space-y-1">
+            <div className="flex items-center gap-2 text-sm text-green-400">
+              <CheckCircle2 className="size-3.5" />
+              Linking complete
+            </div>
+            {linkingJob.progressMessage && (
+              <p className="text-[11px] text-green-400/70 pl-5.5">
+                {linkingJob.progressMessage}
+              </p>
+            )}
+          </div>
+        )}
+
+        {!linking && linkingJob?.status === "failed" && (
+          <div className="flex items-center gap-2 text-sm text-red-400 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
+            <XCircle className="size-3.5" />
+            <span className="truncate">Linking failed: {linkingJob.error}</span>
+          </div>
+        )}
+      </div>
     </>
   );
 }

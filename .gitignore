@@ -43,6 +43,9 @@ next-env.d.ts
 
 # sqlite
 *.db
+*.db-shm
+*.db-wal
+*.db-journal
 
 # uploads
 /uploads

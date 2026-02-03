@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useMutation } from 'convex/react';
+import { api } from '@/lib/convex';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -12,23 +14,21 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { createProject } from '@/app/actions';
 
 export function CreateProjectDialog() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const createProject = useMutation(api.projects.create);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
     setLoading(true);
     try {
-      await createProject(name.trim());
+      await createProject({ name: name.trim() });
       setName('');
       setOpen(false);
-      router.refresh();
     } finally {
       setLoading(false);
     }
@@ -37,11 +37,14 @@ export function CreateProjectDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Create Project</Button>
+        <button className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Plus className="size-3.5" />
+          New project
+        </button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="bg-card border-border">
         <DialogHeader>
-          <DialogTitle>Create New Project</DialogTitle>
+          <DialogTitle className="text-sm font-medium">New project</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <Input
@@ -49,9 +52,14 @@ export function CreateProjectDialog() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             autoFocus
+            className="bg-background border-border"
           />
           <DialogFooter className="mt-4">
-            <Button type="submit" disabled={loading || !name.trim()}>
+            <Button
+              type="submit"
+              disabled={loading || !name.trim()}
+              className="bg-foreground text-background hover:bg-foreground/80 text-sm"
+            >
               {loading ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
