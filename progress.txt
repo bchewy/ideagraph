@@ -15,6 +15,7 @@
 - Next.js 16 dynamic route params are `Promise<{ id: string }>` — must `await params`
 - OpenAI Responses API: file inputs use `type: 'input_file'` with `file_id`, NOT `type: 'file'`
 - Use `zodTextFormat` from `openai/helpers/zod` + `responses.parse()` for typed Structured Outputs
+- `@dagrejs/dagre` ESM bundle contains dynamic `require()` shims — Turbopack rejects it client-side; run dagre server-side only
 
 ---
 
@@ -291,4 +292,19 @@
   - `useNodesState`/`useEdgesState` hooks manage React Flow node/edge state with built-in onChange handlers
   - `useImperativeHandle` + `forwardRef` pattern for parent-controlled refresh of child data fetching
   - `WorkspaceClient` bridges server component (page) and client components (Sidebar + GraphCanvas)
+---
+
+## 2026-02-03 - US-022
+- Installed `@dagrejs/dagre` and built `computeLayout` function in `src/lib/graph/layout.ts`
+- Layout uses dagre with top-to-bottom (TB) direction, 60px node separation, 80px rank separation
+- Moved layout computation to server-side graph API route (dagre's ESM bundle uses dynamic `require()` which Turbopack rejects client-side)
+- Graph API now returns pre-positioned nodes with `position: { x, y }`
+- GraphCanvas reads positions from API data instead of computing layout client-side
+- Browser verified: workspace loads without errors, empty state renders correctly
+- Files changed: package.json, package-lock.json, src/lib/graph/layout.ts, src/app/api/projects/[id]/graph/route.ts, src/components/graph/GraphCanvas.tsx
+- **Learnings for future iterations:**
+  - `@dagrejs/dagre` ESM bundle (`dagre.esm.js`) contains a CJS shim with `require()` references — Turbopack statically rejects this even though the runtime would handle it
+  - Solution: run dagre on the server side (API routes) where Node.js handles CJS packages natively
+  - `computeLayout` returns a `Map<string, { x, y }>` — decoupled from React Flow types for server portability
+  - Dagre centers nodes at computed position; subtract half width/height to get top-left corner for React Flow
 ---
