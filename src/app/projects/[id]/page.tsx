@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getProject } from '@/app/actions';
+import { UploadDropzone } from '@/components/documents/UploadDropzone';
 
 export default async function ProjectWorkspace({
   params,
@@ -30,9 +31,7 @@ export default async function ProjectWorkspace({
           <h2 className="mb-3 text-sm font-medium text-muted-foreground">
             Documents
           </h2>
-          <p className="text-sm text-muted-foreground">
-            No documents yet. Upload a PDF to get started.
-          </p>
+          <UploadDropzone projectId={id} />
         </aside>
 
         <main className="flex-1 bg-muted/30">

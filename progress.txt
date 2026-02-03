@@ -101,3 +101,17 @@
   - Next.js 16 dynamic route params are `Promise<{ id: string }>` — must `await params`
   - `notFound()` from `next/navigation` renders the default 404 page for missing resources
 ---
+
+## 2026-02-03 - US-008
+- Created `UploadDropzone` client component in `src/components/documents/UploadDropzone.tsx`
+- Accepts PDF files only, enforces 50MB limit client-side
+- Dashed border dropzone with drag-over visual feedback (border-primary + bg tint)
+- Shows upload progress text per file, handles multiple files sequentially
+- POSTs to `/api/projects/{id}/upload` as multipart FormData (API built in US-009)
+- Integrated into workspace sidebar
+- Browser verified: dropzone renders with correct styling and instructions
+- Files changed: src/components/documents/UploadDropzone.tsx, src/app/projects/[id]/page.tsx
+- **Learnings for future iterations:**
+  - Native drag-and-drop uses onDragOver/onDragLeave/onDrop — need `e.preventDefault()` on all three
+  - Hidden file input + ref pattern for click-to-browse alongside drag-and-drop
+---
