@@ -308,3 +308,25 @@
   - `computeLayout` returns a `Map<string, { x, y }>` — decoupled from React Flow types for server portability
   - Dagre centers nodes at computed position; subtract half width/height to get top-left corner for React Flow
 ---
+
+## 2026-02-03 - US-023/024/025/026/027/028/029 (batch)
+- **US-023**: Created `IdeaNode` component with label, tag badges, source document badges, and React Flow handles
+- **US-024**: Created `RelationshipEdge` with `BaseEdge`/`getBezierPath`/`EdgeLabelRenderer`, color-coded by type (6 colors)
+- **US-025**: Created `NodeInspector` panel (w-80 right sidebar) showing summary, tags, evidence with document attribution
+- **US-026**: Created `EdgeInspector` panel showing type badge, confidence bar, evidence list
+- **US-027**: Added search input (floating above canvas) that dims non-matching nodes/edges by opacity
+- **US-028**: Created `FilterPanel` (collapsible in sidebar) with document checkboxes, edge type checkboxes, confidence slider
+- **US-029**: Created `ExportButton` that fetches graph data and downloads as JSON
+- Wired node/edge click handlers to show mutually exclusive inspector panels
+- GraphCanvas stores raw data in ref, applies filters as a separate effect, then search dims on top
+- GraphCanvas emits metadata (unique documents, edge types) for FilterPanel population
+- Files changed: src/components/graph/IdeaNode.tsx, RelationshipEdge.tsx, ExportButton.tsx, FilterPanel.tsx, GraphCanvas.tsx, src/components/inspector/NodeInspector.tsx, EdgeInspector.tsx, src/components/WorkspaceClient.tsx, src/app/projects/[id]/page.tsx
+- **Learnings for future iterations:**
+  - React Flow v12 custom nodes: define `nodeTypes` const OUTSIDE the component for stable reference
+  - Custom nodes MUST include `<Handle type="source">` and `<Handle type="target">` for edge connections
+  - Custom edges use `BaseEdge` + `getBezierPath` + `EdgeLabelRenderer` pattern
+  - `EdgeLabelRenderer` labels need `nodrag nopan` classes to not interfere with canvas interaction
+  - When multiple UI panels compete (NodeInspector vs EdgeInspector), clear the other on selection
+  - Filter architecture: store raw data in ref, apply filters via useEffect, search operates on filtered result
+  - Parallel agent execution works well for independent components; shared files need manual integration
+---
