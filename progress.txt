@@ -1,0 +1,21 @@
+## Codebase Patterns
+- Next.js 16 with App Router, src directory, TypeScript
+- Tailwind CSS v4 configured via PostCSS (`@tailwindcss/postcss`)
+- shadcn/ui initialized with `components.json`, components live in `src/components/ui/`
+- Path alias `@/*` maps to `src/*`
+- `npm run typecheck` runs `npx tsc --noEmit`
+- Geist font loaded via `next/font/google` in root layout
+
+---
+
+## 2026-02-03 - US-001
+- Scaffolded Next.js 16.1.6 project with App Router, TypeScript, Tailwind CSS v4
+- Initialized shadcn/ui with Button and Card components
+- Updated root layout with IdeaGraph metadata
+- Updated home page to use shadcn/ui components
+- Files changed: package.json, tsconfig.json, next.config.ts, postcss.config.mjs, eslint.config.mjs, next-env.d.ts, .gitignore, src/app/layout.tsx, src/app/page.tsx, src/app/globals.css, src/lib/utils.ts, src/components/ui/button.tsx, src/components/ui/card.tsx, components.json
+- **Learnings for future iterations:**
+  - create-next-app refuses to run in a directory with existing files — scaffold in /tmp and copy over
+  - shadcn/ui v3.8+ supports Tailwind v4 natively, uses `@theme inline` CSS syntax
+  - Turbopack shows a root warning when a parent directory also has a package-lock.json (benign)
+---

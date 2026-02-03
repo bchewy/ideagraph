@@ -1,0 +1,468 @@
+{
+  "project": "IdeaGraph",
+  "branchName": "master",
+  "description": "IdeaGraph MVP - Upload PDFs, extract ideas via GPT-5.2, generate relationship edges, and explore on a React Flow canvas with evidence-backed nodes and edges.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Project setup with Next.js 16, Tailwind, shadcn/ui",
+      "description": "As a developer, I need the project scaffolded with Next.js 16 (App Router), Tailwind CSS, and shadcn/ui so that all subsequent stories have a working foundation.",
+      "acceptanceCriteria": [
+        "Next.js 16 app created with App Router and TypeScript",
+        "Tailwind CSS configured and working",
+        "shadcn/ui initialized with at least Button and Card components",
+        "Dev server starts without errors",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Install and configure Drizzle ORM with SQLite",
+      "description": "As a developer, I need Drizzle ORM connected to a local SQLite database so that data can be persisted.",
+      "acceptanceCriteria": [
+        "drizzle-orm and better-sqlite3 installed",
+        "drizzle.config.ts configured for SQLite",
+        "Database connection exported from src/lib/db/index.ts",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Define Drizzle schema for projects and documents",
+      "description": "As a developer, I need the projects and documents tables defined so that PDF uploads can be tracked.",
+      "acceptanceCriteria": [
+        "projects table: id (text PK), name (text), createdAt (integer)",
+        "documents table: id (text PK), projectId (text FK), filename (text), openaiFileId (text nullable), status (text default 'pending'), sizeBytes (integer), createdAt (integer)",
+        "Schema defined in src/lib/db/schema.ts",
+        "Migration generated and applied successfully",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Define Drizzle schema for nodes, edges, evidenceRefs, jobs",
+      "description": "As a developer, I need the remaining tables for storing extracted ideas, relationships, evidence, and async job tracking.",
+      "acceptanceCriteria": [
+        "nodes table: id, projectId, label, summary, tags (text JSON), createdAt",
+        "edges table: id, projectId, sourceNodeId, targetNodeId, type, confidence (real), createdAt",
+        "evidenceRefs table: id, nodeId (nullable), edgeId (nullable), documentId, excerpt, locator (nullable)",
+        "jobs table: id, projectId, type, status, error (nullable), createdAt, completedAt (nullable)",
+        "All foreign keys reference correct parent tables",
+        "Migration generated and applied successfully",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Install and configure OpenAI SDK",
+      "description": "As a developer, I need the OpenAI SDK configured so that API calls can be made for extraction and linking.",
+      "acceptanceCriteria": [
+        "openai package installed",
+        "OpenAI client exported from src/lib/openai/client.ts using OPENAI_API_KEY env var",
+        ".env.local.example file created with OPENAI_API_KEY placeholder",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Build projects list page",
+      "description": "As a user, I want to see all my projects and create new ones from the home page.",
+      "acceptanceCriteria": [
+        "Home page at / lists all projects from database",
+        "Each project card shows name and created date",
+        "Create Project button opens dialog with name input",
+        "Creating a project inserts into DB and refreshes list",
+        "Clicking a project navigates to /projects/[id]",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Build project workspace page layout",
+      "description": "As a user, I want a workspace page for each project with a sidebar for documents and a main area for the graph.",
+      "acceptanceCriteria": [
+        "Page at /projects/[id] renders with project name in header",
+        "Left sidebar area reserved for document list and upload",
+        "Main content area reserved for graph canvas",
+        "Right panel area reserved for inspector (hidden by default)",
+        "Responsive layout using Tailwind flex/grid",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Build PDF upload dropzone UI",
+      "description": "As a user, I want to drag and drop PDF files into the workspace to upload them.",
+      "acceptanceCriteria": [
+        "UploadDropzone component in src/components/documents/UploadDropzone.tsx",
+        "Accepts PDF files only, max 50MB",
+        "Shows drag-over visual feedback",
+        "Displays upload progress indicator",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Build upload API route with local storage",
+      "description": "As a developer, I need the upload API to save PDFs locally and create document records.",
+      "acceptanceCriteria": [
+        "POST /api/projects/[id]/upload accepts multipart PDF",
+        "Saves file to uploads/{projectId}/{filename}",
+        "Creates document record in DB with status 'uploaded'",
+        "Returns document ID and metadata",
+        "Rejects non-PDF files and files over 50MB",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Upload PDFs to OpenAI Files API",
+      "description": "As a developer, I need uploaded PDFs sent to OpenAI Files API so they can be referenced during extraction.",
+      "acceptanceCriteria": [
+        "After local save, upload file to OpenAI Files API",
+        "Store returned openaiFileId on document record",
+        "Update document status to 'uploaded'",
+        "Handle upload errors gracefully",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Build document list component",
+      "description": "As a user, I want to see all uploaded documents in the project sidebar with their status.",
+      "acceptanceCriteria": [
+        "DocumentList component in src/components/documents/DocumentList.tsx",
+        "Lists all documents for the project",
+        "Shows filename, status badge (uploaded/extracting/extracted), and file size",
+        "Refreshes when new documents are uploaded",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Build extraction API route with job creation",
+      "description": "As a developer, I need the extract endpoint to create a job and kick off extraction asynchronously.",
+      "acceptanceCriteria": [
+        "POST /api/projects/[id]/extract accepts { documentIds: string[] }",
+        "Creates job record with type 'extraction' and status 'pending'",
+        "Returns { jobId } immediately",
+        "Kicks off async extraction (can be inline for MVP)",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Build idea extraction logic with Structured Outputs",
+      "description": "As a developer, I need the extraction pipeline to call OpenAI Responses API and parse ideas from PDFs.",
+      "acceptanceCriteria": [
+        "src/lib/openai/extract.ts exports extractIdeas function",
+        "Calls OpenAI Responses API with PDF file reference",
+        "Uses Structured Outputs JSON schema for deterministic parsing",
+        "Extracts nodes with label, summary, tags, and source excerpts",
+        "Caps at 30 nodes per document",
+        "Stores nodes and evidenceRefs in database",
+        "Updates document status to 'extracted' on completion",
+        "Updates job status to 'completed' or 'failed'",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Build job status polling endpoint",
+      "description": "As a developer, I need a job status endpoint so the frontend can poll for completion.",
+      "acceptanceCriteria": [
+        "GET /api/jobs/[id] returns job status, type, error, timestamps",
+        "Returns 404 for unknown job IDs",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Build frontend job polling with loading states",
+      "description": "As a user, I want to see extraction progress after uploading documents.",
+      "acceptanceCriteria": [
+        "After triggering extraction, frontend polls GET /api/jobs/[id] every 2 seconds",
+        "Shows loading spinner with job status text",
+        "Stops polling on 'completed' or 'failed'",
+        "Shows error message on failure",
+        "Refreshes graph data on completion",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Build embedding generation for nodes",
+      "description": "As a developer, I need embeddings generated for extracted nodes to enable similarity-based linking.",
+      "acceptanceCriteria": [
+        "src/lib/openai/embeddings.ts exports generateEmbeddings function",
+        "Calls openai.embeddings.create with text-embedding-3-large",
+        "Generates embedding from node label + summary",
+        "Stores embedding vectors (as JSON text in SQLite or separate column)",
+        "Typecheck passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": "May need to add an embedding column to nodes table"
+    },
+    {
+      "id": "US-017",
+      "title": "Build cosine similarity candidate pair generation",
+      "description": "As a developer, I need to find candidate node pairs for relationship classification using cosine similarity.",
+      "acceptanceCriteria": [
+        "Cosine similarity function implemented",
+        "Generates candidate pairs with similarity > 0.4",
+        "Deduplicates nodes with similarity >= 0.88 (merges into single node)",
+        "Returns list of candidate pairs for GPT classification",
+        "Typecheck passes"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Build GPT relationship classification for edges",
+      "description": "As a developer, I need GPT-5.2 to classify relationships between candidate node pairs and create edges.",
+      "acceptanceCriteria": [
+        "src/lib/openai/link.ts exports classifyRelationships function",
+        "Sends candidate pairs to GPT-5.2 with Structured Outputs",
+        "Output schema: edges with source, target, type, confidence, evidence",
+        "Edge types: supports, contradicts, extends, similar, example_of, depends_on",
+        "Only creates edges with evidence and sufficient confidence",
+        "Stores edges and edge evidenceRefs in database",
+        "Typecheck passes"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Build link API route",
+      "description": "As a developer, I need the link endpoint to orchestrate embedding generation and relationship classification.",
+      "acceptanceCriteria": [
+        "POST /api/projects/[id]/link creates a job and triggers linking pipeline",
+        "Generates embeddings for all project nodes",
+        "Runs candidate pair generation",
+        "Runs GPT relationship classification",
+        "Updates job status on completion/failure",
+        "Returns { jobId }",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Build graph data API route",
+      "description": "As a developer, I need an endpoint that returns the full graph for a project.",
+      "acceptanceCriteria": [
+        "GET /api/projects/[id]/graph returns nodes and edges with evidence",
+        "Nodes include: id, label, summary, tags, sources (evidence with documentId and excerpt)",
+        "Edges include: id, source, target, type, confidence, evidence array",
+        "Returns empty arrays when no data exists",
+        "Typecheck passes"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-021",
+      "title": "Install React Flow and build basic graph canvas",
+      "description": "As a user, I want to see extracted ideas displayed as a graph on a canvas.",
+      "acceptanceCriteria": [
+        "reactflow package installed",
+        "GraphCanvas component in src/components/graph/GraphCanvas.tsx",
+        "Fetches graph data from /api/projects/[id]/graph",
+        "Renders nodes and edges on React Flow canvas",
+        "Pan, zoom, and minimap enabled",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-022",
+      "title": "Build force-directed layout with dagre",
+      "description": "As a user, I want nodes automatically arranged in a readable layout.",
+      "acceptanceCriteria": [
+        "dagre package installed",
+        "src/lib/graph/layout.ts exports layout function",
+        "Applies dagre force-directed layout to nodes and edges",
+        "GraphCanvas uses layout function on data load",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-023",
+      "title": "Build custom IdeaNode component",
+      "description": "As a user, I want graph nodes to show idea labels and source document badges.",
+      "acceptanceCriteria": [
+        "IdeaNode component in src/components/graph/IdeaNode.tsx",
+        "Shows node label as primary text",
+        "Shows source document badge(s)",
+        "Styled with Tailwind, visually distinct from default React Flow nodes",
+        "Registered as custom node type in GraphCanvas",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 23,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-024",
+      "title": "Build custom RelationshipEdge component",
+      "description": "As a user, I want graph edges to show relationship types with color coding.",
+      "acceptanceCriteria": [
+        "RelationshipEdge component in src/components/graph/RelationshipEdge.tsx",
+        "Shows relationship type label on edge",
+        "Color-coded by type (e.g., green=supports, red=contradicts, blue=extends)",
+        "Registered as custom edge type in GraphCanvas",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 24,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-025",
+      "title": "Build NodeInspector panel",
+      "description": "As a user, I want to click a node and see its full details with evidence in a side panel.",
+      "acceptanceCriteria": [
+        "NodeInspector component in src/components/inspector/NodeInspector.tsx",
+        "Opens in right panel when a node is clicked on the canvas",
+        "Shows node summary, tags, and all evidence excerpts with document attribution",
+        "Close button to dismiss panel",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 25,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-026",
+      "title": "Build EdgeInspector panel",
+      "description": "As a user, I want to click an edge and see relationship details with evidence.",
+      "acceptanceCriteria": [
+        "EdgeInspector component in src/components/inspector/EdgeInspector.tsx",
+        "Opens in right panel when an edge is clicked on the canvas",
+        "Shows relationship type, confidence score, and evidence excerpts",
+        "Close button to dismiss panel",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 26,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-027",
+      "title": "Add search by label and tag",
+      "description": "As a user, I want to search for nodes by label or tag to find specific ideas.",
+      "acceptanceCriteria": [
+        "Search input above the graph canvas",
+        "Filters displayed nodes by label or tag text match",
+        "Matching nodes are highlighted or non-matching nodes are dimmed",
+        "Clearing search restores full graph view",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 27,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-028",
+      "title": "Add filter by document, type, and confidence",
+      "description": "As a user, I want to filter the graph by source document, edge type, and confidence threshold.",
+      "acceptanceCriteria": [
+        "Filter controls in toolbar or sidebar",
+        "Filter by source document (multi-select dropdown)",
+        "Filter by edge type (checkboxes for each type)",
+        "Filter by minimum confidence (slider or input)",
+        "Graph updates to show only matching nodes and edges",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 28,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-029",
+      "title": "Add JSON export of graph data",
+      "description": "As a user, I want to export the current graph as a JSON file for use in other tools.",
+      "acceptanceCriteria": [
+        "Export button in the workspace toolbar",
+        "Downloads JSON file with all nodes and edges including evidence",
+        "Filename includes project name and timestamp",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 29,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
