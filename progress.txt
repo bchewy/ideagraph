@@ -186,3 +186,9 @@
   - `responses.parse()` returns `output_parsed` with the typed result
   - Model 'gpt-4.1' is used for extraction (good balance of speed and quality)
 ---
+
+## 2026-02-03 - US-014
+- Created `GET /api/jobs/[id]` route returning job status, type, error, timestamps
+- Returns 404 for unknown job IDs
+- Files changed: src/app/api/jobs/[id]/route.ts
+---
