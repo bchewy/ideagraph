@@ -62,3 +62,13 @@
   - Tags stored as JSON text with `text('tags').default('[]')` — parse with JSON.parse on read
   - evidenceRefs uses nullable nodeId and edgeId to associate with either entity
 ---
+
+## 2026-02-03 - US-005
+- Installed `openai` package
+- Created `src/lib/openai/client.ts` exporting configured OpenAI client using `OPENAI_API_KEY` env var
+- Created `.env.local.example` with placeholder API key
+- Files changed: package.json, package-lock.json, src/lib/openai/client.ts, .env.local.example
+- **Learnings for future iterations:**
+  - OpenAI SDK reads `OPENAI_API_KEY` from `process.env` by default, but explicit is clearer
+  - `.env*` pattern in .gitignore matches `.env.local.example` — need `!.env.local.example` exception
+---
