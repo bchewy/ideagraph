@@ -234,3 +234,18 @@
   - O(n^2) pairwise comparison is acceptable for MVP node counts (max ~30 per document)
   - Deduplication deletes the duplicate node from DB, keeping the first encountered
 ---
+
+## 2026-02-03 - US-018
+- Implemented `classifyRelationships(projectId, candidatePairs)` in `src/lib/openai/link.ts`
+- Zod schema with `EdgeTypeEnum` (supports, contradicts, extends, similar, example_of, depends_on)
+- Uses `zodTextFormat` + `responses.parse()` for Structured Outputs (same pattern as extract.ts)
+- Batches candidate pairs in groups of 20 to avoid overloading GPT context
+- Sends node labels, summaries, and cosine similarity to GPT-4.1 for classification
+- Validates GPT-returned edges: checks node IDs against batch, filters confidence < 0.5
+- Stores edges in DB and creates evidenceRefs linked to the edge (uses source node's document)
+- Files changed: src/lib/openai/link.ts
+- **Learnings for future iterations:**
+  - GPT may hallucinate node IDs — validate returned sourceId/targetId against the input batch
+  - Edge evidenceRefs need a documentId; use the source node's first evidence document as fallback
+  - Batch processing prevents token limit issues with large candidate pair sets
+---
