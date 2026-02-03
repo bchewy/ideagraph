@@ -192,3 +192,17 @@
 - Returns 404 for unknown job IDs
 - Files changed: src/app/api/jobs/[id]/route.ts
 ---
+
+## 2026-02-03 - US-015
+- Added extraction trigger button ("Extract Ideas") to Sidebar, visible when uploaded docs exist
+- Polls `GET /api/jobs/{id}` every 2 seconds with `setInterval` + cleanup on unmount
+- Shows spinner with status text during extraction (pending/running)
+- Shows success/error message on completion/failure
+- Refreshes document list on completion, calls `onGraphRefresh` callback
+- Browser verified: sidebar renders correctly, extract button hidden when no uploaded docs
+- Files changed: src/components/documents/Sidebar.tsx
+- **Learnings for future iterations:**
+  - Use `useRef` for interval IDs to avoid stale closures in cleanup
+  - CSS spinner: `animate-spin rounded-full border-2 border-current border-t-transparent`
+  - Sidebar accepts `onGraphRefresh` prop for parent to refresh graph data after extraction
+---
