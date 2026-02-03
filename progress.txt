@@ -155,3 +155,17 @@
   - Pattern: server component fetches initial data, passes to client component, client refreshes via API
   - Sidebar client component manages document state and passes refresh callback to UploadDropzone
 ---
+
+## 2026-02-03 - US-012
+- Created `POST /api/projects/[id]/extract` route
+- Accepts `{ documentIds: string[] }`, validates project exists and documentIds is non-empty
+- Creates job record with type 'extraction', status 'pending'
+- Returns `{ jobId }` immediately, kicks off async extraction via fire-and-forget
+- `runExtraction` updates job status to 'running', calls `extractIdeas`, then updates to 'completed'/'failed'
+- Created stub `extractIdeas` in `src/lib/openai/extract.ts` (updates doc status, actual GPT logic in US-013)
+- Files changed: src/app/api/projects/[id]/extract/route.ts, src/lib/openai/extract.ts
+- **Learnings for future iterations:**
+  - Fire-and-forget pattern: call async function without awaiting, wrap in .catch() for error handling
+  - Dynamic import `await import('@/lib/openai/extract')` to avoid loading extraction code on every request
+  - Job status flow: pending → running → completed/failed
+---
