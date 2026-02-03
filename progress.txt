@@ -10,6 +10,8 @@
 - SQLite database file at `./sqlite.db` (gitignored), WAL mode enabled
 - Use `npx drizzle-kit generate` for migrations, `npx drizzle-kit push` to apply during dev
 - Drizzle SQLite schema: `text('snake_case')` for text, `integer('snake_case')` for ints, camelCase for TS
+- Server actions in `src/app/actions.ts` with `'use server'` directive for DB mutations
+- Client components use `'use client'` directive and call server actions directly
 
 ---
 
@@ -71,4 +73,18 @@
 - **Learnings for future iterations:**
   - OpenAI SDK reads `OPENAI_API_KEY` from `process.env` by default, but explicit is clearer
   - `.env*` pattern in .gitignore matches `.env.local.example` — need `!.env.local.example` exception
+---
+
+## 2026-02-03 - US-006
+- Built projects list page at `/` with server-side data fetching via `getProjects()` action
+- Created `CreateProjectDialog` client component with shadcn/ui Dialog + Input
+- Server action `createProject` inserts into DB and calls `revalidatePath('/')`
+- Added shadcn/ui Dialog and Input components
+- Project cards link to `/projects/[id]` with hover state
+- Browser verified: empty state, dialog, project creation, navigation all working
+- Files changed: src/app/page.tsx, src/app/actions.ts, src/components/CreateProjectDialog.tsx, src/components/ui/dialog.tsx, src/components/ui/input.tsx, package.json, package-lock.json
+- **Learnings for future iterations:**
+  - Server actions with `'use server'` work for CRUD in Next.js 16 App Router
+  - `revalidatePath('/')` + `router.refresh()` needed for server component rerender after mutation
+  - shadcn/ui Dialog needs `open`/`onOpenChange` controlled state for programmatic close
 ---
