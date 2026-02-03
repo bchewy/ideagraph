@@ -129,3 +129,15 @@
   - `Buffer.from(await file.arrayBuffer())` to convert File to writable Buffer
   - `mkdir(dir, { recursive: true })` ensures upload directory exists
 ---
+
+## 2026-02-03 - US-010
+- Added OpenAI Files API upload after local file save in upload route
+- Uses `fs.createReadStream(filePath)` with `openai.files.create({ purpose: 'assistants' })`
+- Stores returned `openaiFileId` on document record
+- Gracefully handles OpenAI upload failures (logs error, continues with null openaiFileId)
+- Files changed: src/app/api/projects/[id]/upload/route.ts
+- **Learnings for future iterations:**
+  - OpenAI files.create accepts `fs.createReadStream()` for Node.js file uploads
+  - Purpose 'assistants' is used for files referenced in Responses API calls
+  - Wrap OpenAI calls in try/catch to avoid blocking the upload flow if API is unavailable
+---

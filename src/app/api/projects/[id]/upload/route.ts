@@ -4,7 +4,9 @@ import { documents, projects } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { writeFile, mkdir } from 'fs/promises';
+import { createReadStream } from 'fs';
 import path from 'path';
+import { openai } from '@/lib/openai/client';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -50,6 +52,17 @@ export async function POST(
   const filePath = path.join(uploadDir, file.name);
   await writeFile(filePath, buffer);
 
+  let openaiFileId: string | null = null;
+  try {
+    const openaiFile = await openai.files.create({
+      file: createReadStream(filePath),
+      purpose: 'assistants',
+    });
+    openaiFileId = openaiFile.id;
+  } catch (err) {
+    console.error('OpenAI file upload failed:', err);
+  }
+
   const docId = randomUUID();
   const now = Math.floor(Date.now() / 1000);
 
@@ -57,6 +70,7 @@ export async function POST(
     id: docId,
     projectId,
     filename: file.name,
+    openaiFileId,
     status: 'uploaded',
     sizeBytes: file.size,
     createdAt: now,
@@ -67,5 +81,6 @@ export async function POST(
     filename: file.name,
     sizeBytes: file.size,
     status: 'uploaded',
+    openaiFileId,
   });
 }
