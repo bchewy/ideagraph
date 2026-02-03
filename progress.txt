@@ -8,6 +8,8 @@
 - Drizzle ORM with better-sqlite3: connection in `src/lib/db/index.ts`, schema in `src/lib/db/schema.ts`
 - drizzle.config.ts points schema to `./src/lib/db/schema.ts`, migrations output to `./drizzle/`
 - SQLite database file at `./sqlite.db` (gitignored), WAL mode enabled
+- Use `npx drizzle-kit generate` for migrations, `npx drizzle-kit push` to apply during dev
+- Drizzle SQLite schema: `text('snake_case')` for text, `integer('snake_case')` for ints, camelCase for TS
 
 ---
 
@@ -34,4 +36,16 @@
   - Drizzle ORM v0.x uses `drizzle({ client: sqlite })` pattern for better-sqlite3
   - drizzle-kit uses `defineConfig` with `dialect: 'sqlite'` (not `driver`)
   - Enable WAL mode via `sqlite.pragma('journal_mode = WAL')` for better concurrent read performance
+---
+
+## 2026-02-03 - US-003
+- Defined `projects` table: id (text PK), name (text), createdAt (integer)
+- Defined `documents` table: id (text PK), projectId (FK → projects.id), filename, openaiFileId (nullable), status (default 'pending'), sizeBytes, createdAt
+- Generated migration via `npx drizzle-kit generate` → drizzle/0000_smooth_daredevil.sql
+- Applied migration via `npx drizzle-kit push`
+- Files changed: src/lib/db/schema.ts, drizzle/0000_smooth_daredevil.sql, drizzle/meta/
+- **Learnings for future iterations:**
+  - `npx drizzle-kit generate` creates SQL migration files in the `drizzle/` directory
+  - `npx drizzle-kit push` applies schema directly to the database (good for development)
+  - Drizzle SQLite uses `text('column_name')` and `integer('column_name')` with snake_case DB names
 ---
