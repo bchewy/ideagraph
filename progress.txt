@@ -262,3 +262,16 @@
   - Pipeline order matters: embeddings must be generated before candidate pairs (which parse them)
   - The `_request` param is unused but required by Next.js route handler signature
 ---
+
+## 2026-02-03 - US-020
+- Created `GET /api/projects/[id]/graph` route at `src/app/api/projects/[id]/graph/route.ts`
+- Returns `{ nodes, edges }` with full evidence data joined from evidenceRefs + documents
+- Nodes include: id, label, summary, tags (parsed from JSON), sources (documentId, filename, excerpt)
+- Edges include: id, source, target, type, confidence, evidence array
+- Returns empty arrays when no nodes/edges exist
+- Files changed: src/app/api/projects/[id]/graph/route.ts
+- **Learnings for future iterations:**
+  - Drizzle `innerJoin` syntax: `db.select().from(table).innerJoin(other, eq(table.col, other.col))`
+  - Tags stored as JSON text in SQLite — parse with `JSON.parse(node.tags)` in the API response
+  - Per-entity evidence queries with `Promise.all` + Map for efficient lookup by ID
+---
