@@ -249,3 +249,16 @@
   - Edge evidenceRefs need a documentId; use the source node's first evidence document as fallback
   - Batch processing prevents token limit issues with large candidate pair sets
 ---
+
+## 2026-02-03 - US-019
+- Created `POST /api/projects/[id]/link` route at `src/app/api/projects/[id]/link/route.ts`
+- Creates job record with type 'linking', status 'pending', returns `{ jobId }` immediately
+- Fire-and-forget async `runLinking` orchestrates: generateEmbeddings → getCandidatePairs → classifyRelationships
+- Updates job status: pending → running → completed/failed
+- Uses dynamic imports to avoid loading heavy AI code on every request
+- Files changed: src/app/api/projects/[id]/link/route.ts
+- **Learnings for future iterations:**
+  - Link route follows same fire-and-forget job pattern as extract route
+  - Pipeline order matters: embeddings must be generated before candidate pairs (which parse them)
+  - The `_request` param is unused but required by Next.js route handler signature
+---
