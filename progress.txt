@@ -12,6 +12,7 @@
 - Drizzle SQLite schema: `text('snake_case')` for text, `integer('snake_case')` for ints, camelCase for TS
 - Server actions in `src/app/actions.ts` with `'use server'` directive for DB mutations
 - Client components use `'use client'` directive and call server actions directly
+- Next.js 16 dynamic route params are `Promise<{ id: string }>` — must `await params`
 
 ---
 
@@ -87,4 +88,16 @@
   - Server actions with `'use server'` work for CRUD in Next.js 16 App Router
   - `revalidatePath('/')` + `router.refresh()` needed for server component rerender after mutation
   - shadcn/ui Dialog needs `open`/`onOpenChange` controlled state for programmatic close
+---
+
+## 2026-02-03 - US-007
+- Created `/projects/[id]` route with workspace layout
+- Added `getProject(id)` server action with `eq()` filter, returns 404 via `notFound()` for missing IDs
+- Layout: header (back link + project name), left sidebar (w-64, documents), main area (graph canvas placeholder)
+- Full-height flex layout with `h-screen`, `overflow-hidden` on content area
+- Browser verified: layout renders correctly with all three zones
+- Files changed: src/app/projects/[id]/page.tsx, src/app/actions.ts
+- **Learnings for future iterations:**
+  - Next.js 16 dynamic route params are `Promise<{ id: string }>` — must `await params`
+  - `notFound()` from `next/navigation` renders the default 404 page for missing resources
 ---
