@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { nodes, edges, evidenceRefs, projects, documents } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { computeLayout } from '@/lib/graph/layout';
 
 export async function GET(
   _request: NextRequest,
@@ -101,5 +102,12 @@ export async function GET(
     })),
   }));
 
-  return NextResponse.json({ nodes: graphNodes, edges: graphEdges });
+  const positions = computeLayout(graphNodes, graphEdges);
+
+  const nodesWithPositions = graphNodes.map((node) => ({
+    ...node,
+    position: positions.get(node.id) ?? { x: 0, y: 0 },
+  }));
+
+  return NextResponse.json({ nodes: nodesWithPositions, edges: graphEdges });
 }

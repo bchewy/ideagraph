@@ -19,6 +19,7 @@ type GraphNode = {
   summary: string;
   tags: string[];
   sources: { documentId: string; filename: string; excerpt: string }[];
+  position: { x: number; y: number };
 };
 
 type GraphEdge = {
@@ -35,9 +36,9 @@ export type GraphCanvasHandle = {
 };
 
 function toFlowNodes(graphNodes: GraphNode[]): Node[] {
-  return graphNodes.map((n, i) => ({
+  return graphNodes.map((n) => ({
     id: n.id,
-    position: { x: (i % 4) * 250, y: Math.floor(i / 4) * 150 },
+    position: n.position,
     data: {
       label: n.label,
       summary: n.summary,
@@ -85,8 +86,10 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, { projectId: string }>(
         })
         .then((data: { nodes: GraphNode[]; edges: GraphEdge[] }) => {
           if (controller.signal.aborted) return;
-          setNodes(toFlowNodes(data.nodes));
-          setEdges(toFlowEdges(data.edges));
+          const flowEdges = toFlowEdges(data.edges);
+          const flowNodes = toFlowNodes(data.nodes);
+          setNodes(flowNodes);
+          setEdges(flowEdges);
           setLoading(false);
         })
         .catch((err) => {
