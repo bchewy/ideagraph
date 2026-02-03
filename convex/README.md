@@ -1,90 +1,39 @@
-# Welcome to your Convex functions directory!
+# Convex Backend
 
-Write your Convex functions here.
-See https://docs.convex.dev/functions for more.
+This directory contains all Convex functions for IdeaGraph — a knowledge graph app that extracts ideas from PDFs using OpenAI.
 
-A query function that takes two arguments looks like:
+## File Structure
 
-```ts
-// convex/myFunctions.ts
-import { query } from "./_generated/server";
-import { v } from "convex/values";
+| File | Purpose |
+|------|---------|
+| `schema.ts` | Database schema (projects, documents, nodes, edges, evidenceRefs, jobs) |
+| `projects.ts` | Project CRUD queries and mutations |
+| `documents.ts` | Document queries and mutations |
+| `graph.ts` | Graph data query (nodes + edges + evidence) |
+| `jobs.ts` | Job status queries and internal mutations |
+| `extraction.ts` | Idea extraction mutation (schedules action) |
+| `extractionAction.ts` | Node.js action calling OpenAI for extraction |
+| `linking.ts` | Relationship linking mutation (schedules action) |
+| `linkingAction.ts` | Node.js action calling OpenAI for embeddings + classification |
 
-export const myQueryFunction = query({
-  // Validators for arguments.
-  args: {
-    first: v.number(),
-    second: v.string(),
-  },
+## Development
 
-  // Function implementation.
-  handler: async (ctx, args) => {
-    // Read the database as many times as you need here.
-    // See https://docs.convex.dev/database/reading-data.
-    const documents = await ctx.db.query("tablename").collect();
-
-    // Arguments passed from the client are properties of the args object.
-    console.log(args.first, args.second);
-
-    // Write arbitrary JavaScript here: filter, aggregate, build derived data,
-    // remove non-public properties, or create new objects.
-    return documents;
-  },
-});
+```bash
+npx convex dev    # Start Convex dev sync (run alongside npm run dev)
+npx convex deploy # Deploy to production
 ```
 
-Using this query function in a React component looks like:
+## Environment Variables
 
-```ts
-const data = useQuery(api.myFunctions.myQueryFunction, {
-  first: 10,
-  second: "hello",
-});
+Set the OpenAI API key in Convex:
+
+```bash
+npx convex env set OPENAI_API_KEY <your-key>
 ```
 
-A mutation function looks like:
+## Architecture Notes
 
-```ts
-// convex/myFunctions.ts
-import { mutation } from "./_generated/server";
-import { v } from "convex/values";
-
-export const myMutationFunction = mutation({
-  // Validators for arguments.
-  args: {
-    first: v.string(),
-    second: v.string(),
-  },
-
-  // Function implementation.
-  handler: async (ctx, args) => {
-    // Insert or modify documents in the database here.
-    // Mutations can also read from the database like queries.
-    // See https://docs.convex.dev/database/writing-data.
-    const message = { body: args.first, author: args.second };
-    const id = await ctx.db.insert("messages", message);
-
-    // Optionally, return a value from your mutation.
-    return await ctx.db.get("messages", id);
-  },
-});
-```
-
-Using this mutation function in a React component looks like:
-
-```ts
-const mutation = useMutation(api.myFunctions.myMutationFunction);
-function handleButtonPress() {
-  // fire and forget, the most common way to use mutations
-  mutation({ first: "Hello!", second: "me" });
-  // OR
-  // use the result once the mutation has completed
-  mutation({ first: "Hello!", second: "me" }).then((result) =>
-    console.log(result),
-  );
-}
-```
-
-Use the Convex CLI to push your functions to a deployment. See everything
-the Convex CLI can do by running `npx convex -h` in your project root
-directory. To learn more, launch the docs with `npx convex docs`.
+- Long-running operations use the **mutation → scheduler → action** pattern
+- Frontend subscribes to job status reactively via `useQuery` (no polling)
+- Actions run in Node.js runtime for OpenAI SDK compatibility
+- IDs are Convex-generated (`Id<"tableName">`), timestamps use `_creationTime`
