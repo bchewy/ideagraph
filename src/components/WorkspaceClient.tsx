@@ -1,11 +1,17 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Sidebar } from '@/components/documents/Sidebar';
-import { GraphCanvas, type GraphCanvasHandle } from '@/components/graph/GraphCanvas';
+import {
+  GraphCanvas,
+  type GraphCanvasHandle,
+  type GraphFilters,
+  type GraphMetadata,
+} from '@/components/graph/GraphCanvas';
 import { NodeInspector, type NodeInspectorData } from '@/components/inspector/NodeInspector';
 import { EdgeInspector } from '@/components/inspector/EdgeInspector';
 import { ExportButton } from '@/components/graph/ExportButton';
+import { FilterPanel } from '@/components/graph/FilterPanel';
 
 type Document = {
   id: string;
@@ -32,6 +38,19 @@ export function WorkspaceClient({
   const graphRef = useRef<GraphCanvasHandle>(null);
   const [selectedNode, setSelectedNode] = useState<NodeInspectorData | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<EdgeData | null>(null);
+  const [filters, setFilters] = useState<GraphFilters>({
+    documentIds: [],
+    edgeTypes: [],
+    minConfidence: 0,
+  });
+  const [graphMeta, setGraphMeta] = useState<GraphMetadata>({
+    documents: [],
+    edgeTypes: [],
+  });
+
+  const handleMetadata = useCallback((meta: GraphMetadata) => {
+    setGraphMeta(meta);
+  }, []);
 
   return (
     <div className="flex flex-1 overflow-hidden">
@@ -41,7 +60,12 @@ export function WorkspaceClient({
           initialDocuments={initialDocuments}
           onGraphRefresh={() => graphRef.current?.refresh()}
         />
-        <div className="mt-4">
+        <div className="mt-4 space-y-3">
+          <FilterPanel
+            documents={graphMeta.documents}
+            edgeTypes={graphMeta.edgeTypes}
+            onFilterChange={setFilters}
+          />
           <ExportButton projectId={projectId} projectName={projectName} />
         </div>
       </aside>
@@ -50,6 +74,7 @@ export function WorkspaceClient({
         <GraphCanvas
           ref={graphRef}
           projectId={projectId}
+          filters={filters}
           onNodeClick={(data) => {
             setSelectedNode(data);
             setSelectedEdge(null);
@@ -58,6 +83,7 @@ export function WorkspaceClient({
             setSelectedEdge(data);
             setSelectedNode(null);
           }}
+          onMetadata={handleMetadata}
         />
       </main>
 
