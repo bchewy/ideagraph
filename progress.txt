@@ -275,3 +275,20 @@
   - Tags stored as JSON text in SQLite — parse with `JSON.parse(node.tags)` in the API response
   - Per-entity evidence queries with `Promise.all` + Map for efficient lookup by ID
 ---
+
+## 2026-02-03 - US-021
+- Installed `@xyflow/react` (React Flow v12) and built GraphCanvas component
+- GraphCanvas fetches from `/api/projects/[id]/graph`, renders nodes/edges on React Flow canvas
+- Includes `Controls`, `MiniMap`, and `Background` components for pan/zoom/navigation
+- Created `WorkspaceClient` component to wire Sidebar refresh callback to GraphCanvas via ref
+- Updated workspace page to use `WorkspaceClient` instead of inline layout
+- `toFlowNodes` and `toFlowEdges` convert API graph data to React Flow format
+- `useImperativeHandle` exposes `refresh()` method for parent to trigger graph reload
+- Empty state shown when no nodes exist, loading state during fetch
+- Files changed: package.json, package-lock.json, src/app/projects/[id]/page.tsx, src/components/WorkspaceClient.tsx, src/components/graph/GraphCanvas.tsx
+- **Learnings for future iterations:**
+  - `@xyflow/react` v12 is the React Flow package (replaces `reactflow` v11)
+  - `useNodesState`/`useEdgesState` hooks manage React Flow node/edge state with built-in onChange handlers
+  - `useImperativeHandle` + `forwardRef` pattern for parent-controlled refresh of child data fetching
+  - `WorkspaceClient` bridges server component (page) and client components (Sidebar + GraphCanvas)
+---
