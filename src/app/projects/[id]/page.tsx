@@ -28,7 +28,7 @@ export default async function ProjectWorkspace({
         </div>
       </header>
 
-      <WorkspaceClient projectId={id} initialDocuments={docs} />
+      <WorkspaceClient projectId={id} projectName={project.name} initialDocuments={docs} />
     </div>
   );
 }

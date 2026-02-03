@@ -12,6 +12,12 @@ import {
   type Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { IdeaNode } from '@/components/graph/IdeaNode';
+import { RelationshipEdge } from '@/components/graph/RelationshipEdge';
+import type { NodeInspectorData } from '@/components/inspector/NodeInspector';
+
+const nodeTypes = { idea: IdeaNode };
+const edgeTypes = { relationship: RelationshipEdge };
 
 type GraphNode = {
   id: string;
@@ -38,6 +44,7 @@ export type GraphCanvasHandle = {
 function toFlowNodes(graphNodes: GraphNode[]): Node[] {
   return graphNodes.map((n) => ({
     id: n.id,
+    type: 'idea',
     position: n.position,
     data: {
       label: n.label,
@@ -53,17 +60,29 @@ function toFlowEdges(graphEdges: GraphEdge[]): Edge[] {
     id: e.id,
     source: e.source,
     target: e.target,
+    type: 'relationship',
     data: {
       relType: e.type,
       confidence: e.confidence,
       evidence: e.evidence,
     },
-    label: e.type,
   }));
 }
 
-export const GraphCanvas = forwardRef<GraphCanvasHandle, { projectId: string }>(
-  function GraphCanvas({ projectId }, ref) {
+type EdgeClickData = {
+  relType: string;
+  confidence: number;
+  evidence: { documentId: string; filename: string; excerpt: string }[];
+};
+
+type GraphCanvasProps = {
+  projectId: string;
+  onNodeClick?: (data: NodeInspectorData) => void;
+  onEdgeClick?: (data: EdgeClickData) => void;
+};
+
+export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(
+  function GraphCanvas({ projectId, onNodeClick, onEdgeClick }, ref) {
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
     const [loading, setLoading] = useState(true);
@@ -121,8 +140,27 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, { projectId: string }>(
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeClick={(_event, node) => {
+          const d = node.data as Record<string, unknown>;
+          onNodeClick?.({
+            label: d.label as string,
+            summary: d.summary as string,
+            tags: d.tags as string[],
+            sources: d.sources as NodeInspectorData['sources'],
+          });
+        }}
+        onEdgeClick={(_event, edge) => {
+          const d = edge.data as Record<string, unknown>;
+          onEdgeClick?.({
+            relType: d.relType as string,
+            confidence: d.confidence as number,
+            evidence: d.evidence as EdgeClickData['evidence'],
+          });
+        }}
         fitView
       >
         <Controls />
