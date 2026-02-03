@@ -5,6 +5,9 @@
 - Path alias `@/*` maps to `src/*`
 - `npm run typecheck` runs `npx tsc --noEmit`
 - Geist font loaded via `next/font/google` in root layout
+- Drizzle ORM with better-sqlite3: connection in `src/lib/db/index.ts`, schema in `src/lib/db/schema.ts`
+- drizzle.config.ts points schema to `./src/lib/db/schema.ts`, migrations output to `./drizzle/`
+- SQLite database file at `./sqlite.db` (gitignored), WAL mode enabled
 
 ---
 
@@ -18,4 +21,17 @@
   - create-next-app refuses to run in a directory with existing files — scaffold in /tmp and copy over
   - shadcn/ui v3.8+ supports Tailwind v4 natively, uses `@theme inline` CSS syntax
   - Turbopack shows a root warning when a parent directory also has a package-lock.json (benign)
+---
+
+## 2026-02-03 - US-002
+- Installed drizzle-orm, better-sqlite3, drizzle-kit, @types/better-sqlite3
+- Created drizzle.config.ts for SQLite dialect with schema at src/lib/db/schema.ts
+- Created src/lib/db/index.ts with better-sqlite3 connection (WAL mode)
+- Created src/lib/db/schema.ts (empty placeholder for US-003)
+- Added *.db to .gitignore
+- Files changed: package.json, package-lock.json, drizzle.config.ts, src/lib/db/index.ts, src/lib/db/schema.ts, .gitignore
+- **Learnings for future iterations:**
+  - Drizzle ORM v0.x uses `drizzle({ client: sqlite })` pattern for better-sqlite3
+  - drizzle-kit uses `defineConfig` with `dialect: 'sqlite'` (not `driver`)
+  - Enable WAL mode via `sqlite.pragma('journal_mode = WAL')` for better concurrent read performance
 ---
