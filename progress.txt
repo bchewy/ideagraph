@@ -115,3 +115,17 @@
   - Native drag-and-drop uses onDragOver/onDragLeave/onDrop — need `e.preventDefault()` on all three
   - Hidden file input + ref pattern for click-to-browse alongside drag-and-drop
 ---
+
+## 2026-02-03 - US-009
+- Created `POST /api/projects/[id]/upload` route at `src/app/api/projects/[id]/upload/route.ts`
+- Validates: project exists, file is PDF, file is under 50MB
+- Saves files to `uploads/{projectId}/{filename}` directory
+- Creates document record with status 'uploaded' in DB
+- Returns document ID, filename, sizeBytes, status
+- Added `/uploads` to .gitignore
+- Files changed: src/app/api/projects/[id]/upload/route.ts, .gitignore
+- **Learnings for future iterations:**
+  - Next.js API routes use `request.formData()` for multipart uploads, `formData.get('file')` returns `File`
+  - `Buffer.from(await file.arrayBuffer())` to convert File to writable Buffer
+  - `mkdir(dir, { recursive: true })` ensures upload directory exists
+---
