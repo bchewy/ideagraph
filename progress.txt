@@ -13,6 +13,8 @@
 - Server actions in `src/app/actions.ts` with `'use server'` directive for DB mutations
 - Client components use `'use client'` directive and call server actions directly
 - Next.js 16 dynamic route params are `Promise<{ id: string }>` — must `await params`
+- OpenAI Responses API: file inputs use `type: 'input_file'` with `file_id`, NOT `type: 'file'`
+- Use `zodTextFormat` from `openai/helpers/zod` + `responses.parse()` for typed Structured Outputs
 
 ---
 
@@ -168,4 +170,19 @@
   - Fire-and-forget pattern: call async function without awaiting, wrap in .catch() for error handling
   - Dynamic import `await import('@/lib/openai/extract')` to avoid loading extraction code on every request
   - Job status flow: pending → running → completed/failed
+---
+
+## 2026-02-03 - US-013
+- Implemented full extraction pipeline in `src/lib/openai/extract.ts`
+- Uses `openai.responses.parse()` with `zodTextFormat` for Structured Outputs
+- Zod schema: ExtractionResult with ideas array (label, summary, tags[], excerpts[])
+- Sends PDF via `input_file` content type referencing the OpenAI file ID
+- Extracts up to 30 ideas per document, stores nodes + evidenceRefs in database
+- Updates document status: extracting → extracted
+- Files changed: src/lib/openai/extract.ts, package.json
+- **Learnings for future iterations:**
+  - OpenAI Responses API file input uses `type: 'input_file'` with `file_id` (not `type: 'file'`)
+  - `zodTextFormat` from `openai/helpers/zod` enables Structured Outputs with Zod schemas
+  - `responses.parse()` returns `output_parsed` with the typed result
+  - Model 'gpt-4.1' is used for extraction (good balance of speed and quality)
 ---
