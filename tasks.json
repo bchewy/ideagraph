@@ -251,7 +251,7 @@
         "Typecheck passes"
       ],
       "priority": 16,
-      "passes": false,
+      "passes": true,
       "notes": "May need to add an embedding column to nodes table"
     },
     {

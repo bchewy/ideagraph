@@ -26,6 +26,7 @@ export const nodes = sqliteTable('nodes', {
   label: text('label').notNull(),
   summary: text('summary').notNull(),
   tags: text('tags').notNull().default('[]'),
+  embedding: text('embedding'),
   createdAt: integer('created_at').notNull(),
 });
 

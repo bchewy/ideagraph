@@ -206,3 +206,17 @@
   - CSS spinner: `animate-spin rounded-full border-2 border-current border-t-transparent`
   - Sidebar accepts `onGraphRefresh` prop for parent to refresh graph data after extraction
 ---
+
+## 2026-02-03 - US-016
+- Added `embedding` column (text, nullable) to `nodes` table in schema
+- Generated migration `drizzle/0002_long_blockbuster.sql`, applied with `drizzle-kit push`
+- Created `src/lib/openai/embeddings.ts` with `generateEmbeddings(projectId)` function
+- Fetches all nodes for a project, generates embeddings from `label: summary` text
+- Calls `openai.embeddings.create` with `text-embedding-3-large` model
+- Stores embedding vectors as JSON text in the `embedding` column
+- Files changed: src/lib/db/schema.ts, src/lib/openai/embeddings.ts, drizzle/0002_long_blockbuster.sql, drizzle/meta/
+- **Learnings for future iterations:**
+  - Embeddings stored as JSON-serialized arrays in SQLite text columns (parse with `JSON.parse`)
+  - `text-embedding-3-large` returns 3072-dimensional vectors by default
+  - OpenAI embeddings API accepts batch input — send all texts in one call for efficiency
+---
