@@ -220,3 +220,17 @@
   - `text-embedding-3-large` returns 3072-dimensional vectors by default
   - OpenAI embeddings API accepts batch input — send all texts in one call for efficiency
 ---
+
+## 2026-02-03 - US-017
+- Created `src/lib/openai/link.ts` with cosine similarity and candidate pair generation
+- `cosineSimilarity(a, b)` computes dot product / (norm_a * norm_b) for embedding vectors
+- `deduplicateNodes()` removes near-duplicate nodes (similarity >= 0.88) from the database
+- `getCandidatePairs(projectId)` fetches nodes with embeddings, deduplicates, then generates all pairs with similarity > 0.4
+- Returns sorted pairs (highest similarity first) for downstream GPT classification
+- Exports `CandidatePair` interface for use in US-018/US-019
+- Files changed: src/lib/openai/link.ts
+- **Learnings for future iterations:**
+  - Embeddings stored as JSON text in SQLite — parse with `JSON.parse(n.embedding!)` to get `number[]`
+  - O(n^2) pairwise comparison is acceptable for MVP node counts (max ~30 per document)
+  - Deduplication deletes the duplicate node from DB, keeping the first encountered
+---
