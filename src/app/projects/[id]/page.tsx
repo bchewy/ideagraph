@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getProject, getDocuments } from '@/app/actions';
-import { Sidebar } from '@/components/documents/Sidebar';
+import { WorkspaceClient } from '@/components/WorkspaceClient';
 
 export default async function ProjectWorkspace({
   params,
@@ -28,19 +28,7 @@ export default async function ProjectWorkspace({
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        <aside className="w-64 shrink-0 border-r p-4 overflow-y-auto">
-          <Sidebar projectId={id} initialDocuments={docs} />
-        </aside>
-
-        <main className="flex-1 bg-muted/30">
-          <div className="flex h-full items-center justify-center text-muted-foreground">
-            Graph canvas will appear here
-          </div>
-        </main>
-
-        {/* Inspector panel - hidden by default, shown when node/edge selected */}
-      </div>
+      <WorkspaceClient projectId={id} initialDocuments={docs} />
     </div>
   );
 }
