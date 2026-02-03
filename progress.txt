@@ -49,3 +49,16 @@
   - `npx drizzle-kit push` applies schema directly to the database (good for development)
   - Drizzle SQLite uses `text('column_name')` and `integer('column_name')` with snake_case DB names
 ---
+
+## 2026-02-03 - US-004
+- Defined `nodes` table: id, projectId (FK), label, summary, tags (JSON text default '[]'), createdAt
+- Defined `edges` table: id, projectId (FK), sourceNodeId (FK → nodes), targetNodeId (FK → nodes), type, confidence (real), createdAt
+- Defined `evidenceRefs` table: id, nodeId (FK nullable), edgeId (FK nullable), documentId (FK), excerpt, locator (nullable)
+- Defined `jobs` table: id, projectId (FK), type, status (default 'pending'), error (nullable), createdAt, completedAt (nullable)
+- Generated migration drizzle/0001_wooden_unus.sql, applied with push
+- Files changed: src/lib/db/schema.ts, drizzle/0001_wooden_unus.sql, drizzle/meta/
+- **Learnings for future iterations:**
+  - Use `real('column')` from drizzle-orm/sqlite-core for floating-point columns (e.g., confidence scores)
+  - Tags stored as JSON text with `text('tags').default('[]')` — parse with JSON.parse on read
+  - evidenceRefs uses nullable nodeId and edgeId to associate with either entity
+---
