@@ -6,7 +6,7 @@ import { api, type Id } from '@/lib/convex';
 import { UploadDropzone } from './UploadDropzone';
 import { DocumentList } from './DocumentList';
 import { Button } from '@/components/ui/button';
-import { Sparkles, Link2, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Sparkles, Link2, Loader2, CheckCircle2, XCircle, Crosshair } from 'lucide-react';
 
 export function Sidebar({ projectId }: { projectId: Id<"projects"> }) {
   const documents = useQuery(api.documents.list, { projectId });
@@ -14,6 +14,11 @@ export function Sidebar({ projectId }: { projectId: Id<"projects"> }) {
   const startLinkingMutation = useMutation(api.linking.start);
 
   const [extractionJobId, setExtractionJobId] = useState<Id<"jobs"> | null>(null);
+  const [, setBackfillJobId] = useState<Id<"jobs"> | null>(null);
+  const [backfillStatus, setBackfillStatus] = useState<
+    'idle' | 'running' | 'completed' | 'failed'
+  >('idle');
+  const [backfillMessage, setBackfillMessage] = useState<string | null>(null);
   const [linkingJobId, setLinkingJobId] = useState<Id<"jobs"> | null>(null);
 
   const latestLinkingJob = useQuery(api.jobs.getLatestByType, {
@@ -41,10 +46,11 @@ export function Sidebar({ projectId }: { projectId: Id<"projects"> }) {
   const extracting =
     extractionJobId !== null &&
     (extractionJob?.status === "pending" || extractionJob?.status === "running");
+  const backfilling = backfillStatus === 'running';
   const linking =
     linkingJobId !== null &&
     (linkingJob?.status === "pending" || linkingJob?.status === "running");
-  const isBusy = extracting || linking;
+  const isBusy = extracting || linking || backfilling;
 
   // Auto-trigger linking after extraction completes (only for this session)
   const prevExtractionStatus = useRef<string | undefined>(undefined);
@@ -77,6 +83,32 @@ export function Sidebar({ projectId }: { projectId: Id<"projects"> }) {
     setLinkingJobId(jobId);
   }
 
+  async function handleStartBackfill() {
+    try {
+      setBackfillStatus('running');
+      setBackfillMessage('Backfilling evidence locators...');
+      setBackfillJobId(null);
+      const response = await fetch(`/api/projects/${projectId}/backfill-locators`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error ?? 'Backfill failed');
+      }
+      const payload = await response.json().catch(() => ({}));
+      const updated = payload.updated as number | undefined;
+      setBackfillStatus('completed');
+      setBackfillMessage(
+        `Backfilled ${updated ?? 0} locator${updated === 1 ? '' : 's'}.`
+      );
+    } catch (error) {
+      setBackfillStatus('failed');
+      setBackfillMessage(
+        error instanceof Error ? error.message : 'Backfill failed'
+      );
+    }
+  }
+
   const uploadedCount = (documents ?? []).filter((d) => d.status === "uploaded").length;
   const extractedCount = (documents ?? []).filter((d) => d.status === "extracted").length;
 
@@ -103,6 +135,14 @@ export function Sidebar({ projectId }: { projectId: Id<"projects"> }) {
         <Button onClick={handleStartLinking} variant="outline" className="mt-4 w-full gap-2" size="sm">
           <Link2 className="size-3.5" />
           Link Ideas
+        </Button>
+      )}
+
+      {/* Backfill locators */}
+      {!isBusy && extractedCount > 0 && (
+        <Button onClick={handleStartBackfill} variant="outline" className="mt-3 w-full gap-2" size="sm">
+          <Crosshair className="size-3.5" />
+          Backfill Evidence Locators
         </Button>
       )}
 
@@ -222,6 +262,36 @@ export function Sidebar({ projectId }: { projectId: Id<"projects"> }) {
                   </div>
                 </div>
               )}
+          </div>
+        )}
+
+        {backfilling && (
+          <div className="rounded-lg border border-border/60 bg-card/30 px-3 py-2.5 space-y-2">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin text-primary shrink-0" />
+              <span>
+                {backfillMessage ?? 'Backfilling evidence locators...'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {!backfilling && backfillStatus === 'completed' && (
+          <div className="rounded-lg border border-green-500/20 bg-green-500/5 px-3 py-2.5 space-y-1">
+            <div className="flex items-center gap-2 text-sm text-green-400">
+              <CheckCircle2 className="size-3.5" />
+              Locator backfill complete
+            </div>
+            {backfillMessage && (
+              <p className="text-[11px] text-green-400/70 pl-5.5">{backfillMessage}</p>
+            )}
+          </div>
+        )}
+
+        {!backfilling && backfillStatus === 'failed' && (
+          <div className="flex items-center gap-2 text-sm text-red-400 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
+            <XCircle className="size-3.5" />
+            <span className="truncate">Locator backfill failed: {backfillMessage}</span>
           </div>
         )}
 

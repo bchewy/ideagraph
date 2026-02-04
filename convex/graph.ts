@@ -28,6 +28,7 @@ export const get = query({
               documentId: ref.documentId as string,
               filename: doc?.filename ?? "Unknown",
               excerpt: ref.excerpt,
+              locator: ref.locator,
             };
           })
         );
@@ -63,6 +64,7 @@ export const get = query({
               documentId: ref.documentId as string,
               filename: doc?.filename ?? "Unknown",
               excerpt: ref.excerpt,
+              locator: ref.locator,
             };
           })
         );
@@ -73,6 +75,7 @@ export const get = query({
           target: edge.targetNodeId as string,
           type: edge.type,
           confidence: edge.confidence,
+          reasoning: edge.reasoning,
           evidence,
         };
       })

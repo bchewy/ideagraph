@@ -1,6 +1,6 @@
 'use client';
 
-import { X, FileText } from 'lucide-react';
+import { X, FileText, Crosshair } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -26,22 +26,25 @@ type EvidenceItem = {
   documentId: string;
   filename: string;
   excerpt: string;
+  locator?: string;
 };
 
 type EdgeInspectorProps = {
   edge: {
     relType: string;
     confidence: number;
+    reasoning?: string;
     evidence: EvidenceItem[];
   };
   onClose: () => void;
+  onEvidenceClick?: (item: EvidenceItem) => void;
 };
 
 function formatConfidence(confidence: number): string {
   return `${Math.round(confidence * 100)}%`;
 }
 
-export function EdgeInspector({ edge, onClose }: EdgeInspectorProps) {
+export function EdgeInspector({ edge, onClose, onEvidenceClick }: EdgeInspectorProps) {
   const { relType, confidence, evidence } = edge;
   const badgeColor = EDGE_TYPE_COLORS[relType] ?? 'bg-muted text-muted-foreground';
   const displayLabel = EDGE_TYPE_LABELS[relType] ?? relType;
@@ -62,6 +65,17 @@ export function EdgeInspector({ edge, onClose }: EdgeInspectorProps) {
           <p className="mb-2 text-xs font-medium text-muted-foreground">Type</p>
           <Badge className={badgeColor}>{displayLabel}</Badge>
         </section>
+
+        {edge.reasoning && (
+          <section>
+            <p className="mb-2 text-xs font-medium text-muted-foreground">
+              Reasoning
+            </p>
+            <p className="text-sm leading-relaxed text-card-foreground">
+              {edge.reasoning}
+            </p>
+          </section>
+        )}
 
         <section>
           <p className="mb-1 text-xs font-medium text-muted-foreground">
@@ -86,20 +100,33 @@ export function EdgeInspector({ edge, onClose }: EdgeInspectorProps) {
               Evidence ({evidence.length})
             </p>
             <ul className="space-y-3">
-              {evidence.map((item, index) => (
-                <li
-                  key={`${item.documentId}-${index}`}
-                  className="rounded-lg border bg-muted/40 p-3"
-                >
-                  <div className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <FileText className="size-3 shrink-0" />
-                    <span className="truncate">{item.filename}</span>
-                  </div>
-                  <p className="text-sm leading-relaxed text-card-foreground">
-                    {item.excerpt}
-                  </p>
-                </li>
-              ))}
+              {evidence.map((item, index) => {
+                const hasLocator = Boolean(item.locator);
+                return (
+                  <li key={`${item.documentId}-${index}`}>
+                    <button
+                      type="button"
+                      onClick={() => onEvidenceClick?.(item)}
+                      className="group w-full rounded-lg border bg-muted/40 p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 cursor-pointer"
+                    >
+                      <div className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        {hasLocator ? (
+                          <Crosshair className="size-3 shrink-0 text-primary" />
+                        ) : (
+                          <FileText className="size-3 shrink-0" />
+                        )}
+                        <span className="truncate">{item.filename}</span>
+                      </div>
+                      <p className="text-sm leading-relaxed text-card-foreground">
+                        {item.excerpt}
+                      </p>
+                      <p className="text-[10px] text-primary/0 group-hover:text-primary/60 transition-colors mt-1.5">
+                        {hasLocator ? 'Click to view highlighted in PDF' : 'Click to view in PDF'}
+                      </p>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         )}

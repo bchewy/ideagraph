@@ -107,8 +107,10 @@ export const saveEdge = internalMutation({
     targetNodeId: v.id("nodes"),
     type: v.string(),
     confidence: v.number(),
+    reasoning: v.optional(v.string()),
     evidenceDocumentId: v.optional(v.id("documents")),
     evidenceExcerpt: v.optional(v.string()),
+    evidenceLocator: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const edgeId = await ctx.db.insert("edges", {
@@ -117,6 +119,7 @@ export const saveEdge = internalMutation({
       targetNodeId: args.targetNodeId,
       type: args.type,
       confidence: args.confidence,
+      reasoning: args.reasoning,
     });
 
     if (args.evidenceDocumentId && args.evidenceExcerpt) {
@@ -124,6 +127,7 @@ export const saveEdge = internalMutation({
         edgeId,
         documentId: args.evidenceDocumentId,
         excerpt: args.evidenceExcerpt,
+        ...(args.evidenceLocator ? { locator: args.evidenceLocator } : {}),
       });
     }
   },

@@ -13,6 +13,7 @@ type RelationshipEdgeData = {
   relType: string;
   confidence: number;
   showLabel?: boolean;
+  reasoning?: string;
   evidence: { documentId: string; filename: string; excerpt: string }[];
 };
 

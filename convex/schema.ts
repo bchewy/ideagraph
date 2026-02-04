@@ -30,6 +30,7 @@ export default defineSchema({
     targetNodeId: v.id("nodes"),
     type: v.string(),
     confidence: v.number(),
+    reasoning: v.optional(v.string()),
   }).index("by_project", ["projectId"]),
 
   evidenceRefs: defineTable({
@@ -40,7 +41,8 @@ export default defineSchema({
     locator: v.optional(v.string()),
   })
     .index("by_node", ["nodeId"])
-    .index("by_edge", ["edgeId"]),
+    .index("by_edge", ["edgeId"])
+    .index("by_document", ["documentId"]),
 
   jobs: defineTable({
     projectId: v.id("projects"),

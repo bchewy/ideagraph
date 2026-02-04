@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery } from 'convex/react';
 import { api, type Id } from '@/lib/convex';
 import { WorkspaceClient } from '@/components/WorkspaceClient';
+import { AsciiLoader } from '@/components/AsciiLoader';
 
 export default function ProjectWorkspace({
   params,
@@ -18,7 +19,7 @@ export default function ProjectWorkspace({
   if (project === undefined) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <AsciiLoader label="Loading workspace" />
       </div>
     );
   }

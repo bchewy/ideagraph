@@ -1,6 +1,6 @@
 "use node";
 
-import { internalAction } from "./_generated/server";
+import { internalAction, type ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import OpenAI from "openai";
@@ -40,6 +40,7 @@ const ClassifiedEdge = z.object({
   type: EdgeTypeEnum,
   confidence: z.number().min(0).max(1),
   evidence: z.string(),
+  reasoning: z.string(),
 });
 
 const ClassificationResult = z.object({
@@ -329,7 +330,8 @@ export const processBatch = internalAction({
 For each pair, determine:
 - type: one of "supports", "contradicts", "extends", "similar", "example_of", "depends_on"
 - confidence: a value between 0 and 1 indicating how confident you are in the relationship
-- evidence: a brief explanation of why this relationship exists
+- evidence: a short quote-level justification (<= 1 sentence)
+- reasoning: a concise, explicit rationale for the relationship (1-3 sentences)
 
 Only include pairs where you can identify a meaningful relationship with reasonable confidence (>= 0.5).
 Use the exact sourceId and targetId values provided.
@@ -371,6 +373,7 @@ Relationship type definitions:
             { nodeId: edge.sourceId as Id<"nodes"> }
           );
           const documentId = evidenceRefs[0]?.documentId;
+          const evidenceLocator = evidenceRefs[0]?.locator;
 
           await ctx.runMutation(internal.linking.saveEdge, {
             projectId,
@@ -378,8 +381,10 @@ Relationship type definitions:
             targetNodeId: edge.targetId as Id<"nodes">,
             type: edge.type,
             confidence: edge.confidence,
+            reasoning: edge.reasoning,
             evidenceDocumentId: documentId,
             evidenceExcerpt: documentId ? edge.evidence : undefined,
+            evidenceLocator: evidenceLocator,
           });
           batchLinksCreated++;
         }
@@ -421,9 +426,8 @@ Relationship type definitions:
 });
 
 // Helper to finish the job and clean up
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function finishJob(
-  ctx: any,
+  ctx: ActionCtx,
   jobId: Id<"jobs">,
   linksCreated: number,
   nodeCount: number,

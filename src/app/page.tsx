@@ -5,6 +5,7 @@ import { useQuery } from 'convex/react';
 import { api } from '@/lib/convex';
 import { CreateProjectDialog } from '@/components/CreateProjectDialog';
 import { DeleteProjectButton } from '@/components/DeleteProjectButton';
+import { AsciiLoader } from '@/components/AsciiLoader';
 
 export default function Home() {
   const projectList = useQuery(api.projects.list);
@@ -12,7 +13,7 @@ export default function Home() {
   if (projectList === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <AsciiLoader label="Loading projects" />
       </div>
     );
   }

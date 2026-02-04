@@ -6,6 +6,15 @@ import { v } from "convex/values";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
+import path from "path";
+import { readFile } from "fs/promises";
+import DOMMatrix from "dommatrix";
+
+type EvidenceLocator = {
+  page: number;
+  text: string;
+  boxes: Array<{ x: number; y: number; width: number; height: number }>;
+};
 
 const IdeaSchema = z.object({
   label: z.string(),
@@ -19,6 +28,173 @@ const ExtractionResult = z.object({
   documentSummary: z.string(),
   ideas: z.array(IdeaSchema).max(30),
 });
+
+function normalizeText(value: string): string {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function normalizeLoose(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildPageTextMap(
+  textItems: Array<{ str: string }>,
+  mode: "strict" | "loose" = "strict"
+) {
+  const text = textItems.map((item) => item.str).join(" ");
+  const normalizedChars: string[] = [];
+  const map: number[] = [];
+  let lastWasSpace = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const isSpace = /\s/.test(ch);
+    const isKeep = mode === "strict" ? true : /[a-z0-9\s]/i.test(ch);
+    if (!isKeep) continue;
+    if (isSpace) {
+      if (!lastWasSpace) {
+        normalizedChars.push(" ");
+        map.push(i);
+      }
+      lastWasSpace = true;
+    } else {
+      normalizedChars.push(ch.toLowerCase());
+      map.push(i);
+      lastWasSpace = false;
+    }
+  }
+  const rawNormalized = normalizedChars.join("");
+  const trimmedStart = rawNormalized.length - rawNormalized.trimStart().length;
+  const trimmedEnd = rawNormalized.length - rawNormalized.trimEnd().length;
+  const normalized = rawNormalized.slice(trimmedStart, rawNormalized.length - trimmedEnd);
+  return { text, normalized, map, offset: trimmedStart };
+}
+
+function extractItemBounds(
+  item: { width: number; height: number; transform: number[] },
+  viewport: { height: number }
+) {
+  const [, , , d, e, f] = item.transform;
+  const height = Math.abs(d) || item.height || 0;
+  const width = item.width || 0;
+  const x = e;
+  const y = viewport.height - f - height;
+  return { x, y, width, height };
+}
+
+function buildLocator(
+  pageNumber: number,
+  excerpt: string,
+  textItems: Array<{ str: string; width: number; height: number; transform: number[] }>,
+  viewport: { height: number }
+): EvidenceLocator | null {
+  if (!excerpt) return null;
+  const normalizedExcerpt = normalizeText(excerpt);
+  if (!normalizedExcerpt) return null;
+  const { text, normalized, map, offset } = buildPageTextMap(textItems, "strict");
+  const strictIndex = normalized.indexOf(normalizedExcerpt);
+  let start = strictIndex;
+  let effectiveMap = map;
+  let effectiveOffset = offset;
+  let usedLoose = false;
+  if (start === -1) {
+    const looseExcerpt = normalizeLoose(excerpt);
+    const looseMapData = buildPageTextMap(textItems, "loose");
+    start = looseMapData.normalized.indexOf(looseExcerpt);
+    if (start === -1) return null;
+    effectiveMap = looseMapData.map;
+    effectiveOffset = looseMapData.offset;
+    usedLoose = true;
+  }
+  const matchLength = usedLoose
+    ? normalizeLoose(excerpt).length
+    : normalizedExcerpt.length;
+  const end = start + matchLength - 1;
+  const startRaw = start + effectiveOffset;
+  const endRaw = end + effectiveOffset;
+  const originalStart = effectiveMap[Math.min(startRaw, effectiveMap.length - 1)] ?? 0;
+  const originalEnd = effectiveMap[Math.min(endRaw, effectiveMap.length - 1)] ?? text.length - 1;
+  const prefix = text.slice(0, originalStart + 1);
+  const rangeText = text.slice(originalStart, originalEnd + 1);
+  const prefixItems = prefix.trim().split(/\s+/).filter(Boolean).length;
+  const rangeItems = rangeText.trim().split(/\s+/).filter(Boolean).length;
+  const startIndex = Math.max(0, prefixItems - 1);
+  const endIndex = Math.min(textItems.length - 1, startIndex + Math.max(0, rangeItems - 1));
+  if (!textItems[startIndex] || !textItems[endIndex]) return null;
+
+  const boxes = textItems
+    .slice(startIndex, endIndex + 1)
+    .map((item) => extractItemBounds(item, viewport))
+    .filter((box) => box.width > 0 && box.height > 0);
+
+  if (boxes.length === 0) return null;
+
+  return {
+    page: pageNumber,
+    text: excerpt,
+    boxes,
+  };
+}
+
+async function buildPdfLocatorsFromBuffer(
+  buffer: Buffer,
+  excerpts: string[]
+): Promise<Map<string, EvidenceLocator>> {
+  if (!globalThis.DOMMatrix) {
+    globalThis.DOMMatrix = DOMMatrix;
+  }
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const pdf = await getDocument({ data: buffer }).promise;
+  const locatorMap = new Map<string, EvidenceLocator>();
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+    const page = await pdf.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: 1 });
+    const textContent = await page.getTextContent();
+    const items = textContent.items as Array<{
+      str: string;
+      width: number;
+      height: number;
+      transform: number[];
+    }>;
+    for (const excerpt of excerpts) {
+      if (locatorMap.has(excerpt)) continue;
+      const locator = buildLocator(pageNumber, excerpt, items, viewport);
+      if (locator) {
+        locatorMap.set(excerpt, locator);
+      }
+    }
+    if (locatorMap.size === excerpts.length) break;
+  }
+  return locatorMap;
+}
+
+async function getDocumentBuffer(
+  filePath: string | null,
+  openai: OpenAI,
+  openaiFileId: string
+): Promise<Buffer> {
+  if (filePath) {
+    return await readFile(filePath);
+  }
+  const fileResponse = await openai.files.content(openaiFileId);
+  return Buffer.from(await fileResponse.arrayBuffer());
+}
+
+async function resolvePdfBuffer(
+  filePath: string | null,
+  openai: OpenAI,
+  openaiFileId: string,
+  cache: Map<string, Buffer>
+): Promise<Buffer> {
+  const cached = cache.get(openaiFileId);
+  if (cached) return cached;
+  const buffer = await getDocumentBuffer(filePath, openai, openaiFileId);
+  cache.set(openaiFileId, buffer);
+  return buffer;
+}
 
 // Runs in Node.js — calls OpenAI to extract ideas from documents
 export const run = internalAction({
@@ -39,6 +215,7 @@ export const run = internalAction({
 
     try {
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const bufferCache = new Map<string, Buffer>();
       let totalIdeas = 0;
 
       for (let i = 0; i < documentIds.length; i++) {
@@ -101,6 +278,27 @@ Extract up to 30 ideas. Focus on the most important and distinct concepts.`,
         if (parsed) {
           totalIdeas += parsed.ideas.length;
 
+          const uploadPath = path.join(process.cwd(), "uploads", projectId, doc.filename);
+          const allExcerpts = parsed.ideas.flatMap((idea) => idea.excerpts || []);
+          let locatorMap = new Map<string, EvidenceLocator>();
+          try {
+            let filePath: string | null = uploadPath;
+            try {
+              await readFile(uploadPath);
+            } catch {
+              filePath = null;
+            }
+            const buffer = await resolvePdfBuffer(
+              filePath,
+              openai,
+              doc.openaiFileId,
+              bufferCache
+            );
+            locatorMap = await buildPdfLocatorsFromBuffer(buffer, allExcerpts);
+          } catch (error) {
+            console.warn(`Failed to build locators for ${doc.filename}:`, error);
+          }
+
           await ctx.runMutation(internal.jobs.updateProgress, {
             id: jobId,
             progressMessage: `Saving ${parsed.ideas.length} ideas from "${doc.filename}"…`,
@@ -111,7 +309,13 @@ Extract up to 30 ideas. Focus on the most important and distinct concepts.`,
             projectId,
             documentId: docId,
             documentSummary: parsed.documentSummary,
-            ideas: parsed.ideas,
+            ideas: parsed.ideas.map((idea) => ({
+              ...idea,
+              locators: idea.excerpts.map((excerpt) => {
+                const locator = locatorMap.get(excerpt);
+                return locator ? JSON.stringify(locator) : null;
+              }),
+            })),
           });
         }
 
@@ -133,6 +337,117 @@ Extract up to 30 ideas. Focus on the most important and distinct concepts.`,
       await ctx.runMutation(internal.jobs.updateProgress, {
         id: jobId,
         progressMessage: `Done — extracted ${totalIdeas} idea${totalIdeas === 1 ? "" : "s"} from ${documentIds.length} document${documentIds.length === 1 ? "" : "s"}`,
+      });
+      await ctx.runMutation(internal.jobs.markCompleted, { id: jobId });
+    } catch (err) {
+      await ctx.runMutation(internal.jobs.markFailed, {
+        id: jobId,
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
+  },
+});
+
+export const backfillLocators = internalAction({
+  args: {
+    jobId: v.id("jobs"),
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, { jobId, projectId }) => {
+    await ctx.runMutation(internal.jobs.markRunning, { id: jobId });
+    await ctx.runMutation(internal.jobs.updateProgress, {
+      id: jobId,
+      progressCurrent: 0,
+      progressTotal: 0,
+      progressMessage: "Scanning evidence for missing locators…",
+    });
+
+    try {
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const bufferCache = new Map<string, Buffer>();
+
+      const docs = await ctx.runQuery(internal.documents.getByProject, {
+        projectId,
+      });
+
+      const eligibleDocs = docs.filter((doc) => doc.openaiFileId);
+      await ctx.runMutation(internal.jobs.updateProgress, {
+        id: jobId,
+        progressTotal: eligibleDocs.length,
+        progressMessage: `Processing ${eligibleDocs.length} document${eligibleDocs.length === 1 ? "" : "s"}…`,
+      });
+
+      let processed = 0;
+      let updated = 0;
+
+      for (const doc of eligibleDocs) {
+        const evidenceRefs = await ctx.runQuery(internal.extraction.getEvidenceByDocument, {
+          documentId: doc._id,
+        });
+        const missing = evidenceRefs.filter((ref) => !ref.locator);
+        if (missing.length === 0) {
+          processed += 1;
+          await ctx.runMutation(internal.jobs.updateProgress, {
+            id: jobId,
+            progressCurrent: processed,
+            progressMessage: `No missing locators in ${doc.filename}`,
+          });
+          continue;
+        }
+
+        const uploadPath = path.join(process.cwd(), "uploads", projectId, doc.filename);
+        let filePath: string | null = uploadPath;
+        try {
+          await readFile(uploadPath);
+        } catch {
+          filePath = null;
+        }
+
+        let buffer: Buffer;
+        try {
+          buffer = await resolvePdfBuffer(
+            filePath,
+            openai,
+            doc.openaiFileId as string,
+            bufferCache
+          );
+        } catch (error) {
+          processed += 1;
+          await ctx.runMutation(internal.jobs.updateProgress, {
+            id: jobId,
+            progressCurrent: processed,
+            progressMessage: `Failed to fetch ${doc.filename}`,
+          });
+          console.warn(`Failed to fetch PDF for ${doc.filename}:`, error);
+          continue;
+        }
+
+        const locatorMap = await buildPdfLocatorsFromBuffer(
+          buffer,
+          missing.map((ref) => ref.excerpt)
+        );
+
+        for (const ref of missing) {
+          const locator = locatorMap.get(ref.excerpt);
+          if (!locator) continue;
+          await ctx.runMutation(internal.extraction.patchEvidenceLocator, {
+            id: ref._id,
+            locator: JSON.stringify(locator),
+          });
+          updated += 1;
+        }
+
+        processed += 1;
+        await ctx.runMutation(internal.jobs.updateProgress, {
+          id: jobId,
+          progressCurrent: processed,
+          progressMessage: `Backfilled ${updated} locator${updated === 1 ? "" : "s"} so far…`,
+        });
+      }
+
+      await ctx.runMutation(internal.jobs.updateProgress, {
+        id: jobId,
+        progressMessage: `Done — backfilled ${updated} locator${updated === 1 ? "" : "s"} across ${eligibleDocs.length} document${eligibleDocs.length === 1 ? "" : "s"}`,
       });
       await ctx.runMutation(internal.jobs.markCompleted, { id: jobId });
     } catch (err) {

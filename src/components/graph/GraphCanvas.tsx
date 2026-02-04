@@ -8,6 +8,7 @@ import {
   Background,
   useNodesState,
   useEdgesState,
+  type ReactFlowInstance,
   type Node,
   type Edge,
 } from '@xyflow/react';
@@ -19,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { IdeaNode } from '@/components/graph/IdeaNode';
 import { RelationshipEdge } from '@/components/graph/RelationshipEdge';
 import { DocumentGroup } from '@/components/graph/DocumentGroup';
+import { AsciiLoader } from '@/components/AsciiLoader';
 import type { NodeInspectorData } from '@/components/inspector/NodeInspector';
 
 const nodeTypes = { idea: IdeaNode, documentGroup: DocumentGroup };
@@ -29,7 +31,7 @@ type GraphNode = {
   label: string;
   summary: string;
   tags: string[];
-  sources: { documentId: string; filename: string; excerpt: string }[];
+  sources: { documentId: string; filename: string; excerpt: string; locator?: string }[];
   position: { x: number; y: number };
 };
 
@@ -39,7 +41,8 @@ type GraphEdge = {
   target: string;
   type: string;
   confidence: number;
-  evidence: { documentId: string; filename: string; excerpt: string }[];
+  reasoning?: string;
+  evidence: { documentId: string; filename: string; excerpt: string; locator?: string }[];
 };
 
 export type GraphFilters = {
@@ -92,6 +95,7 @@ function toFlowEdges(graphEdges: GraphEdge[]): Edge[] {
       relType: e.type,
       confidence: e.confidence,
       showLabel: false,
+      reasoning: e.reasoning,
       evidence: e.evidence,
     },
   }));
@@ -100,7 +104,8 @@ function toFlowEdges(graphEdges: GraphEdge[]): Edge[] {
 type EdgeClickData = {
   relType: string;
   confidence: number;
-  evidence: { documentId: string; filename: string; excerpt: string }[];
+  reasoning?: string;
+  evidence: { documentId: string; filename: string; excerpt: string; locator?: string }[];
 };
 
 type GraphCanvasProps = {
@@ -132,6 +137,7 @@ export function GraphCanvas({
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [search, setSearch] = useState('');
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
+  const flowInstanceRef = useRef<ReactFlowInstance | null>(null);
 
   // Reactive graph data from Convex
   const graphData = useQuery(api.graph.get, { projectId });
@@ -203,6 +209,22 @@ export function GraphCanvas({
     rawEdges: GraphEdge[],
     groups: GroupBox[]
   ) {
+    const { flowNodes, flowEdges } = buildFilteredFlow(rawNodes, rawEdges, groups);
+    filteredFlowRef.current = { nodes: flowNodes, edges: flowEdges };
+
+    if (focusedNodeId) {
+      applyFocus(focusedNodeId, flowNodes, flowEdges);
+    } else {
+      setNodes(flowNodes);
+      setEdges(flowEdges);
+    }
+  }
+
+  function buildFilteredFlow(
+    rawNodes: GraphNode[],
+    rawEdges: GraphEdge[],
+    groups: GroupBox[]
+  ) {
     let filteredNodes = rawNodes;
     let filteredEdges = rawEdges;
 
@@ -228,16 +250,10 @@ export function GraphCanvas({
       }
     }
 
-    const flowNodes = toFlowNodes(filteredNodes, groups);
-    const flowEdges = toFlowEdges(filteredEdges);
-    filteredFlowRef.current = { nodes: flowNodes, edges: flowEdges };
-
-    if (focusedNodeId) {
-      applyFocus(focusedNodeId, flowNodes, flowEdges);
-    } else {
-      setNodes(flowNodes);
-      setEdges(flowEdges);
-    }
+    return {
+      flowNodes: toFlowNodes(filteredNodes, groups),
+      flowEdges: toFlowEdges(filteredEdges),
+    };
   }
 
   // ── Focus mode ──
@@ -354,10 +370,21 @@ export function GraphCanvas({
     });
   }, [search, setNodes, setEdges, nodeMatchesSearch, focusedNodeId]);
 
+  function handleResetLayout() {
+    if (!computedRef.current) return;
+    const { nodes: rawNodes, edges: rawEdges, groups } = computedRef.current;
+    const { flowNodes, flowEdges } = buildFilteredFlow(rawNodes, rawEdges, groups);
+    filteredFlowRef.current = { nodes: flowNodes, edges: flowEdges };
+    setFocusedNodeId(null);
+    setNodes(flowNodes);
+    setEdges(flowEdges);
+    flowInstanceRef.current?.fitView({ padding: 0.1, maxZoom: 1 });
+  }
+
   if (graphData === undefined) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        Loading graph...
+      <div className="flex h-full items-center justify-center">
+        <AsciiLoader label="Loading graph" size="sm" />
       </div>
     );
   }
@@ -382,6 +409,13 @@ export function GraphCanvas({
           }}
           className="w-72 bg-card border-border shadow-lg text-xs"
         />
+        <button
+          type="button"
+          onClick={handleResetLayout}
+          className="shrink-0 rounded border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Reset layout
+        </button>
         {focusedNodeId && (
           <button
             onClick={clearFocus}
@@ -429,6 +463,7 @@ export function GraphCanvas({
               label: neighbor.label as string,
               relType: ed.relType as string,
               confidence: ed.confidence as number,
+              reasoning: ed.reasoning as string | undefined,
             });
           }
 
@@ -445,11 +480,15 @@ export function GraphCanvas({
           onEdgeClick?.({
             relType: d.relType as string,
             confidence: d.confidence as number,
+            reasoning: d.reasoning as string | undefined,
             evidence: d.evidence as EdgeClickData['evidence'],
           });
         }}
         onPaneClick={() => {
           if (focusedNodeId) clearFocus();
+        }}
+        onInit={(instance) => {
+          flowInstanceRef.current = instance;
         }}
         fitView
         fitViewOptions={{ padding: 0.1, maxZoom: 1 }}

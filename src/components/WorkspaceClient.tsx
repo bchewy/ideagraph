@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { Sidebar } from '@/components/documents/Sidebar';
 import {
   GraphCanvas,
@@ -12,13 +13,22 @@ import { NodeInspector, type NodeInspectorData } from '@/components/inspector/No
 import { EdgeInspector } from '@/components/inspector/EdgeInspector';
 import { ExportButton } from '@/components/graph/ExportButton';
 import { FilterPanel } from '@/components/graph/FilterPanel';
-import type { Id } from '@/lib/convex';
+import type { EvidenceLocator, Id } from '@/lib/convex';
 
 type EdgeData = {
   relType: string;
   confidence: number;
-  evidence: { documentId: string; filename: string; excerpt: string }[];
+  reasoning?: string;
+  evidence: { documentId: string; filename: string; excerpt: string; locator?: string }[];
 };
+
+const PdfEvidenceModal = dynamic(
+  () =>
+    import('@/components/documents/PdfEvidenceModal').then(
+      (mod) => mod.PdfEvidenceModal
+    ),
+  { ssr: false }
+);
 
 export function WorkspaceClient({
   projectId,
@@ -30,6 +40,11 @@ export function WorkspaceClient({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedNode, setSelectedNode] = useState<NodeInspectorData | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<EdgeData | null>(null);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [evidenceFileUrl, setEvidenceFileUrl] = useState<string | null>(null);
+  const [evidenceLocator, setEvidenceLocator] = useState<EvidenceLocator | null>(null);
+  const [evidenceTitle, setEvidenceTitle] = useState('');
+  const [evidenceExcerpt, setEvidenceExcerpt] = useState('');
   const [filters, setFilters] = useState<GraphFilters>({
     documentIds: [],
     edgeTypes: [],
@@ -103,6 +118,18 @@ export function WorkspaceClient({
         <NodeInspector
           data={selectedNode}
           onClose={() => setSelectedNode(null)}
+          onEvidenceClick={(source) => {
+            const locator = source.locator
+              ? (JSON.parse(source.locator) as EvidenceLocator)
+              : null;
+            setEvidenceTitle(source.filename);
+            setEvidenceExcerpt(source.excerpt);
+            setEvidenceFileUrl(
+              `/api/projects/${projectId}/documents/${source.documentId}/file`
+            );
+            setEvidenceLocator(locator);
+            setEvidenceOpen(true);
+          }}
         />
       )}
 
@@ -111,9 +138,30 @@ export function WorkspaceClient({
           <EdgeInspector
             edge={selectedEdge}
             onClose={() => setSelectedEdge(null)}
+            onEvidenceClick={(item) => {
+              const locator = item.locator
+                ? (JSON.parse(item.locator) as EvidenceLocator)
+                : null;
+              setEvidenceTitle(item.filename);
+              setEvidenceExcerpt(item.excerpt);
+              setEvidenceFileUrl(
+                `/api/projects/${projectId}/documents/${item.documentId}/file`
+              );
+              setEvidenceLocator(locator);
+              setEvidenceOpen(true);
+            }}
           />
         </aside>
       )}
+
+      <PdfEvidenceModal
+        open={evidenceOpen}
+        onOpenChange={setEvidenceOpen}
+        title={evidenceTitle}
+        excerpt={evidenceExcerpt}
+        fileUrl={evidenceFileUrl}
+        locator={evidenceLocator}
+      />
     </div>
   );
 }

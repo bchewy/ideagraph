@@ -32,6 +32,29 @@ export const get = internalQuery({
   },
 });
 
+export const getByProject = internalQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, { projectId }) => {
+    return await ctx.db
+      .query("documents")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .collect();
+  },
+});
+
+export const getPublic = query({
+  args: { id: v.id("documents") },
+  handler: async (ctx, { id }) => {
+    const doc = await ctx.db.get(id);
+    if (!doc) return null;
+    return {
+      _id: doc._id,
+      projectId: doc.projectId,
+      filename: doc.filename,
+    };
+  },
+});
+
 export const updateStatus = internalMutation({
   args: {
     id: v.id("documents"),
