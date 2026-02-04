@@ -1,11 +1,10 @@
 services:
   app:
+    env_file: .env.prod
     build:
       context: .
       args:
         NEXT_PUBLIC_CONVEX_URL: ${NEXT_PUBLIC_CONVEX_URL}
-    ports:
-      - "3000:3000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}
@@ -13,6 +12,19 @@ services:
     volumes:
       - uploads:/app/uploads
     restart: unless-stopped
+    networks:
+      - traefik_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ideagraph.rule=Host(`ideagraph.bchewy.com`)"
+      - "traefik.http.routers.ideagraph.entrypoints=https"
+      - "traefik.http.routers.ideagraph.tls=true"
+      - "traefik.http.routers.ideagraph.tls.certresolver=letsencrypt"
+      - "traefik.http.services.ideagraph.loadbalancer.server.port=3000"
+
+networks:
+  traefik_proxy:
+    external: true
 
 volumes:
   uploads:
