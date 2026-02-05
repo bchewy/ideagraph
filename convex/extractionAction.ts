@@ -278,7 +278,9 @@ Extract up to 30 ideas. Focus on the most important and distinct concepts.`,
         if (parsed) {
           totalIdeas += parsed.ideas.length;
 
-          const uploadPath = path.join(process.cwd(), "uploads", projectId, doc.filename);
+          // Sanitize filename to prevent path traversal (defense in depth)
+          const sanitizedFilename = path.basename(doc.filename);
+          const uploadPath = path.join(process.cwd(), "uploads", projectId, sanitizedFilename);
           const allExcerpts = parsed.ideas.flatMap((idea) => idea.excerpts || []);
           let locatorMap = new Map<string, EvidenceLocator>();
           try {
@@ -296,7 +298,8 @@ Extract up to 30 ideas. Focus on the most important and distinct concepts.`,
             );
             locatorMap = await buildPdfLocatorsFromBuffer(buffer, allExcerpts);
           } catch (error) {
-            console.warn(`Failed to build locators for ${doc.filename}:`, error);
+            // Log only error message, not full error object (may contain sensitive data)
+            console.warn(`Failed to build locators for ${doc.filename}:`, error instanceof Error ? error.message : 'Unknown error');
           }
 
           await ctx.runMutation(internal.jobs.updateProgress, {
@@ -395,7 +398,9 @@ export const backfillLocators = internalAction({
           continue;
         }
 
-        const uploadPath = path.join(process.cwd(), "uploads", projectId, doc.filename);
+        // Sanitize filename to prevent path traversal (defense in depth)
+        const sanitizedFilename = path.basename(doc.filename);
+        const uploadPath = path.join(process.cwd(), "uploads", projectId, sanitizedFilename);
         let filePath: string | null = uploadPath;
         try {
           await readFile(uploadPath);
@@ -418,7 +423,8 @@ export const backfillLocators = internalAction({
             progressCurrent: processed,
             progressMessage: `Failed to fetch ${doc.filename}`,
           });
-          console.warn(`Failed to fetch PDF for ${doc.filename}:`, error);
+          // Log only error message, not full error object (may contain sensitive data)
+          console.warn(`Failed to fetch PDF for ${doc.filename}:`, error instanceof Error ? error.message : 'Unknown error');
           continue;
         }
 

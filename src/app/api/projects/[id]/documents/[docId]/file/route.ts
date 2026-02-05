@@ -22,7 +22,9 @@ export async function GET(
     return NextResponse.json({ error: 'Document not found' }, { status: 404 });
   }
 
-  const filePath = path.join(process.cwd(), 'uploads', projectId, doc.filename);
+  // Sanitize filename to prevent path traversal (defense in depth)
+  const sanitizedFilename = path.basename(doc.filename);
+  const filePath = path.join(process.cwd(), 'uploads', projectId, sanitizedFilename);
   let buffer: Buffer;
   try {
     buffer = await readFile(filePath);

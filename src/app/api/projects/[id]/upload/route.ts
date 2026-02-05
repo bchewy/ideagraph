@@ -7,6 +7,7 @@ import path from 'path';
 import OpenAI from 'openai';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const PDF_MAGIC_BYTES = Buffer.from([0x25, 0x50, 0x44, 0x46]); // %PDF
 
 function getConvexClient() {
   return new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL as string);
@@ -48,12 +49,26 @@ export async function POST(
     );
   }
 
+  // Sanitize filename to prevent path traversal attacks
+  const sanitizedFilename = path.basename(file.name);
+  if (!sanitizedFilename || sanitizedFilename.startsWith('.')) {
+    return NextResponse.json({ error: 'Invalid filename' }, { status: 400 });
+  }
+
+  // Read file buffer and validate PDF magic bytes
+  const buffer = Buffer.from(await file.arrayBuffer());
+  if (buffer.length < 4 || !buffer.subarray(0, 4).equals(PDF_MAGIC_BYTES)) {
+    return NextResponse.json(
+      { error: 'Invalid PDF file' },
+      { status: 400 }
+    );
+  }
+
   // Save file to disk
   const uploadDir = path.join(process.cwd(), 'uploads', projectId);
   await mkdir(uploadDir, { recursive: true });
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const filePath = path.join(uploadDir, file.name);
+  const filePath = path.join(uploadDir, sanitizedFilename);
   await writeFile(filePath, buffer);
 
   // Upload to OpenAI Files API
@@ -66,13 +81,14 @@ export async function POST(
     });
     openaiFileId = openaiFile.id;
   } catch (err) {
-    console.error('OpenAI file upload failed:', err);
+    // Log only error message, not full error object (may contain sensitive data)
+    console.error('OpenAI file upload failed:', err instanceof Error ? err.message : 'Unknown error');
   }
 
   // Create document record in Convex
   const docId = await convex.mutation(api.documents.create, {
     projectId: projectId as Id<"projects">,
-    filename: file.name,
+    filename: sanitizedFilename,
     status: 'uploaded',
     sizeBytes: file.size,
     ...(openaiFileId ? { openaiFileId } : {}),
@@ -80,7 +96,7 @@ export async function POST(
 
   return NextResponse.json({
     id: docId,
-    filename: file.name,
+    filename: sanitizedFilename,
     sizeBytes: file.size,
     status: 'uploaded',
     openaiFileId,

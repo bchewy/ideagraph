@@ -163,7 +163,9 @@ export async function POST(
 
     let buffer: Uint8Array | null = null;
     try {
-      const uploadPath = path.join(process.cwd(), 'uploads', projectId, doc.filename);
+      // Sanitize filename to prevent path traversal (defense in depth)
+      const sanitizedFilename = path.basename(doc.filename);
+      const uploadPath = path.join(process.cwd(), 'uploads', projectId, sanitizedFilename);
       const fileBuffer = await readFile(uploadPath);
       buffer = Uint8Array.from(fileBuffer);
     } catch {
