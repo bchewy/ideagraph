@@ -2,6 +2,8 @@
 
 import { useState, useCallback } from 'react';
 
+export const DEFAULT_MIN_CONFIDENCE = 60;
+
 const EDGE_TYPE_LABELS: Record<string, string> = {
   supports: 'Supports',
   contradicts: 'Contradicts',
@@ -10,6 +12,17 @@ const EDGE_TYPE_LABELS: Record<string, string> = {
   example_of: 'Example of',
   depends_on: 'Depends on',
 };
+
+const EDGE_TYPE_COLORS: Record<string, string> = {
+  supports: '#4ade80',
+  contradicts: '#f87171',
+  extends: '#60a5fa',
+  similar: '#c084fc',
+  example_of: '#fb923c',
+  depends_on: '#2dd4bf',
+};
+
+const FALLBACK_EDGE_COLOR = '#666666';
 
 type FilterState = {
   documentIds: string[];
@@ -31,7 +44,7 @@ export function FilterPanel({
   const [collapsed, setCollapsed] = useState(false);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [selectedEdgeTypes, setSelectedEdgeTypes] = useState<string[]>([]);
-  const [minConfidence, setMinConfidence] = useState(0);
+  const [minConfidence, setMinConfidence] = useState(DEFAULT_MIN_CONFIDENCE);
 
   const emitChange = useCallback(
     (
@@ -130,7 +143,16 @@ export function FilterPanel({
                     onChange={() => handleEdgeTypeToggle(type)}
                     className="rounded border-border"
                   />
-                  <span>{EDGE_TYPE_LABELS[type] ?? type}</span>
+                  <span className="flex items-center gap-2">
+                    <span
+                      aria-hidden="true"
+                      className="h-1.5 w-4 shrink-0 rounded-full border border-border/60"
+                      style={{
+                        backgroundColor: EDGE_TYPE_COLORS[type] ?? FALLBACK_EDGE_COLOR,
+                      }}
+                    />
+                    <span>{EDGE_TYPE_LABELS[type] ?? type}</span>
+                  </span>
                 </label>
               ))}
             </div>

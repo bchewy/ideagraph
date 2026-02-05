@@ -12,7 +12,7 @@ import {
 import { NodeInspector, type NodeInspectorData } from '@/components/inspector/NodeInspector';
 import { EdgeInspector } from '@/components/inspector/EdgeInspector';
 import { ExportButton } from '@/components/graph/ExportButton';
-import { FilterPanel } from '@/components/graph/FilterPanel';
+import { FilterPanel, DEFAULT_MIN_CONFIDENCE } from '@/components/graph/FilterPanel';
 import type { EvidenceLocator, Id } from '@/lib/convex';
 
 type EdgeData = {
@@ -48,7 +48,7 @@ export function WorkspaceClient({
   const [filters, setFilters] = useState<GraphFilters>({
     documentIds: [],
     edgeTypes: [],
-    minConfidence: 0,
+    minConfidence: DEFAULT_MIN_CONFIDENCE,
   });
   const [graphMeta, setGraphMeta] = useState<GraphMetadata>({
     documents: [],

@@ -7,6 +7,14 @@ import { UploadDropzone } from './UploadDropzone';
 import { DocumentList } from './DocumentList';
 import { Button } from '@/components/ui/button';
 import { Sparkles, Link2, Loader2, CheckCircle2, XCircle, Crosshair } from 'lucide-react';
+import { OnboardingButton } from '@/components/onboarding/OnboardingDialog';
+
+const LINK_IDEAS_TOOLTIP =
+  'Create relationship edges between ideas (supports, contradicts, etc.) using embeddings + GPT. Runs in background.';
+const BACKFILL_LOCATORS_TOOLTIP =
+  'Populate missing PDF locator data so evidence highlights can jump to exact text positions. Safe to re-run.';
+const TOOLTIP_CLASSNAME =
+  'pointer-events-none absolute left-1/2 bottom-full mb-2 w-max max-w-[220px] -translate-x-1/2 translate-y-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-[11px] leading-snug text-card-foreground opacity-0 shadow-md transition-all duration-150 whitespace-normal group-hover:opacity-100 group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:translate-y-0 z-20';
 
 export function Sidebar({ projectId }: { projectId: Id<"projects"> }) {
   const documents = useQuery(api.documents.list, { projectId });
@@ -114,6 +122,11 @@ export function Sidebar({ projectId }: { projectId: Id<"projects"> }) {
 
   return (
     <>
+      {/* Quick tour button */}
+      <div className="mb-4">
+        <OnboardingButton />
+      </div>
+
       <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Documents
       </h2>
@@ -132,25 +145,56 @@ export function Sidebar({ projectId }: { projectId: Id<"projects"> }) {
 
       {/* Link button (manual) */}
       {!isBusy && extractedCount > 0 && uploadedCount === 0 && !linkingJob && (
-        <Button onClick={handleStartLinking} variant="outline" className="mt-4 w-full gap-2" size="sm">
+        <Button
+          onClick={handleStartLinking}
+          variant="outline"
+          className="mt-4 w-full gap-2 relative group"
+          size="sm"
+          aria-describedby="link-ideas-tooltip"
+        >
           <Link2 className="size-3.5" />
           Link Ideas
+          <span id="link-ideas-tooltip" role="tooltip" className={TOOLTIP_CLASSNAME}>
+            {LINK_IDEAS_TOOLTIP}
+          </span>
         </Button>
       )}
 
       {/* Backfill locators */}
       {!isBusy && extractedCount > 0 && (
-        <Button onClick={handleStartBackfill} variant="outline" className="mt-3 w-full gap-2" size="sm">
+        <Button
+          onClick={handleStartBackfill}
+          variant="outline"
+          className="mt-3 w-full gap-2 relative group"
+          size="sm"
+          aria-describedby="backfill-locators-tooltip"
+        >
           <Crosshair className="size-3.5" />
           Backfill Evidence Locators
+          <span
+            id="backfill-locators-tooltip"
+            role="tooltip"
+            className={TOOLTIP_CLASSNAME}
+          >
+            {BACKFILL_LOCATORS_TOOLTIP}
+          </span>
         </Button>
       )}
 
       {/* Re-link button */}
       {!isBusy && linkingJob?.status === "completed" && (
-        <Button onClick={handleStartLinking} variant="outline" className="mt-3 w-full gap-2" size="sm">
+        <Button
+          onClick={handleStartLinking}
+          variant="outline"
+          className="mt-3 w-full gap-2 relative group"
+          size="sm"
+          aria-describedby="relink-ideas-tooltip"
+        >
           <Link2 className="size-3.5" />
           Re-link Ideas
+          <span id="relink-ideas-tooltip" role="tooltip" className={TOOLTIP_CLASSNAME}>
+            {LINK_IDEAS_TOOLTIP}
+          </span>
         </Button>
       )}
 
