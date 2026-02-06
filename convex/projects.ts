@@ -28,6 +28,20 @@ export const create = mutation({
   },
 });
 
+// Delete all projects and cascade-clean their data
+export const clearAll = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const projects = await ctx.db.query("projects").collect();
+    for (const project of projects) {
+      await ctx.db.delete(project._id);
+      await ctx.scheduler.runAfter(0, internal.projects.performDelete, {
+        projectId: project._id,
+      });
+    }
+  },
+});
+
 // Delete the project record immediately, then clean up related data in batches
 export const remove = mutation({
   args: { id: v.id("projects") },

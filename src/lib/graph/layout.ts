@@ -1,9 +1,10 @@
 const NODE_WIDTH = 220;
-const NODE_HEIGHT = 70;
+const NODE_HEIGHT = 90;
 const NODE_GAP_X = 60;
-const NODE_GAP_Y = 50;
+const NODE_GAP_Y = 40;
 const GROUP_PADDING = 50;
 const GROUP_HEADER = 56;
+const GROUP_SUMMARY = 120;
 const GROUP_GAP = 180;
 
 type LayoutNode = { id: string; documentId?: string };
@@ -12,6 +13,7 @@ type LayoutEdge = { source: string; target: string };
 export type GroupBox = {
   documentId: string;
   filename: string;
+  summary?: string;
   x: number;
   y: number;
   width: number;
@@ -27,6 +29,7 @@ export type GroupBox = {
 export function computeLayout(
   nodes: LayoutNode[],
   _edges: LayoutEdge[],
+  summaries?: Map<string, string>,
 ): { positions: Map<string, { x: number; y: number }>; groups: GroupBox[] } {
   const positions = new Map<string, { x: number; y: number }>();
   const groups: GroupBox[] = [];
@@ -52,23 +55,24 @@ export function computeLayout(
   }
 
   // Determine columns per group — aim for roughly 3-4 columns
-  function layoutGroup(groupNodes: LayoutNode[], offsetX: number, offsetY: number) {
+  function layoutGroup(groupNodes: LayoutNode[], offsetX: number, offsetY: number, hasSummary: boolean) {
     const n = groupNodes.length;
     const cols = Math.min(3, Math.max(2, Math.ceil(Math.sqrt(n))));
     const rows = Math.ceil(n / cols);
+    const headerHeight = GROUP_HEADER + (hasSummary ? GROUP_SUMMARY : 0);
 
     for (let i = 0; i < n; i++) {
       const col = i % cols;
       const row = Math.floor(i / cols);
       positions.set(groupNodes[i].id, {
         x: offsetX + GROUP_PADDING + col * (NODE_WIDTH + NODE_GAP_X),
-        y: offsetY + GROUP_HEADER + GROUP_PADDING + row * (NODE_HEIGHT + NODE_GAP_Y),
+        y: offsetY + headerHeight + GROUP_PADDING + row * (NODE_HEIGHT + NODE_GAP_Y),
       });
     }
 
     const actualCols = Math.min(cols, n);
     const width = GROUP_PADDING * 2 + actualCols * NODE_WIDTH + (actualCols - 1) * NODE_GAP_X;
-    const height = GROUP_HEADER + GROUP_PADDING * 2 + rows * NODE_HEIGHT + (rows - 1) * NODE_GAP_Y;
+    const height = headerHeight + GROUP_PADDING * 2 + rows * NODE_HEIGHT + (rows - 1) * NODE_GAP_Y;
     return { width, height };
   }
 
@@ -78,10 +82,12 @@ export function computeLayout(
   );
 
   for (const [docId, group] of sortedGroups) {
-    const { width, height } = layoutGroup(group.nodes, cursorX, 0);
+    const summary = summaries?.get(docId);
+    const { width, height } = layoutGroup(group.nodes, cursorX, 0, !!summary);
     groups.push({
       documentId: docId,
       filename: group.filename,
+      summary,
       x: cursorX,
       y: 0,
       width,
@@ -92,7 +98,7 @@ export function computeLayout(
 
   // Ungrouped nodes go in their own section
   if (ungrouped.length > 0) {
-    const { width, height } = layoutGroup(ungrouped, cursorX, 0);
+    const { width, height } = layoutGroup(ungrouped, cursorX, 0, false);
     groups.push({
       documentId: '__ungrouped',
       filename: 'Other',

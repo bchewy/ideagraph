@@ -97,7 +97,7 @@ export function WorkspaceClient({
       )}
 
       {/* Graph */}
-      <main className="flex-1 relative">
+      <main className="flex-1 relative" data-onboarding="graph">
         <GraphCanvas
           projectId={projectId}
           filters={filters}

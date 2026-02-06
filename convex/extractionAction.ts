@@ -26,7 +26,7 @@ const IdeaSchema = z.object({
 
 const ExtractionResult = z.object({
   documentSummary: z.string(),
-  ideas: z.array(IdeaSchema).max(30),
+  ideas: z.array(IdeaSchema).max(15),
 });
 
 function normalizeText(value: string): string {
@@ -242,18 +242,31 @@ export const run = internalAction({
 
         const response = await openai.responses.parse({
           model: "gpt-5.2",
-          instructions: `You are an expert knowledge analyst. Extract the key ideas from the provided PDF document.
+          instructions: `You are an expert academic analyst building a knowledge graph. Your job is to extract the genuinely important IDEAS and CLAIMS from a research paper — not every detail.
 
 First, write a one-paragraph summary of the entire document.
 
-For each idea, provide:
-- label: A concise title (5-10 words)
-- summary: A 1-2 sentence explanation
-- tags: 2-5 relevant topic tags
-- excerpts: 1-2 direct quotes from the document that support this idea
-- confidence: A number between 0 and 1 indicating how well the excerpts support the idea
+Then extract ideas. Be HIGHLY SELECTIVE. A good idea for the knowledge graph is one that:
+- Represents a core thesis, novel contribution, key finding, or significant claim
+- Could meaningfully connect to ideas in OTHER papers (not just internal details)
+- Would be worth debating, building upon, or citing independently
+- Is distinct from other ideas you've already extracted (no overlapping concepts)
 
-Extract up to 30 ideas. Focus on the most important and distinct concepts.`,
+Do NOT extract:
+- Background context or literature review summaries (unless the paper makes a novel claim about them)
+- Methodology details that are standard/routine (only extract if the method itself is a contribution)
+- Minor observations, caveats, or implementation details
+- Restatements of the same idea with different wording
+- Future work suggestions (unless they constitute a specific, substantive claim)
+
+Aim for 5-12 ideas for a typical paper. Only reach 15 for exceptionally dense, multi-contribution papers. Quality over quantity — fewer strong ideas make a better graph than many weak ones.
+
+For each idea:
+- label: A specific, assertive title (5-10 words) — frame it as a claim, not a topic. "X improves Y by Z" is better than "Discussion of X"
+- summary: A 1-2 sentence explanation of the specific claim or contribution
+- tags: 2-5 relevant topic tags
+- excerpts: 1-2 direct quotes from the document that most strongly support this idea
+- confidence: How central this idea is to the paper's contribution (1.0 = core thesis, 0.7+ = significant finding, below 0.5 = probably not worth extracting)`,
           input: [
             {
               role: "user",

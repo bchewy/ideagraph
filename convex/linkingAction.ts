@@ -152,6 +152,7 @@ export const run = internalAction({
             merged.add(nodesWithEmb[j].id);
             await ctx.runMutation(internal.linking.deleteNode, {
               id: nodesWithEmb[j].id,
+              mergeIntoId: nodesWithEmb[i].id,
             });
           }
         }

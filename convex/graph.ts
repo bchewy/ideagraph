@@ -1,5 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 
 export const get = query({
   args: { projectId: v.id("projects") },
@@ -81,6 +82,20 @@ export const get = query({
       })
     );
 
-    return { nodes: graphNodes, edges: graphEdges };
+    // Collect unique documents with summaries
+    const docIds = new Set<string>();
+    for (const node of graphNodes) {
+      for (const s of node.sources) {
+        docIds.add(s.documentId);
+      }
+    }
+    const documents = await Promise.all(
+      [...docIds].map(async (id) => {
+        const doc = await ctx.db.get(id as Id<"documents">);
+        return { id, filename: doc?.filename ?? "Unknown", summary: doc?.summary };
+      })
+    );
+
+    return { nodes: graphNodes, edges: graphEdges, documents };
   },
 });

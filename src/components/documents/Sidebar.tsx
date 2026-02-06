@@ -130,12 +130,15 @@ export function Sidebar({ projectId }: { projectId: Id<"projects"> }) {
       <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Documents
       </h2>
-      <UploadDropzone projectId={projectId} />
+      <div data-onboarding="upload">
+        <UploadDropzone projectId={projectId} />
+      </div>
       <div className="mt-4">
         <DocumentList documents={documents ?? []} />
       </div>
 
       {/* Extract button */}
+      <div data-onboarding="sidebar-actions">
       {uploadedCount > 0 && !isBusy && (
         <Button onClick={handleExtract} className="mt-4 w-full gap-2" size="sm">
           <Sparkles className="size-3.5" />
@@ -197,6 +200,7 @@ export function Sidebar({ projectId }: { projectId: Id<"projects"> }) {
           </span>
         </Button>
       )}
+      </div>
 
       {/* Status messages */}
       <div className="mt-4 space-y-2">

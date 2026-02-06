@@ -56,28 +56,42 @@ export type GraphMetadata = {
   edgeTypes: string[];
 };
 
-function toFlowNodes(graphNodes: GraphNode[], groups: GroupBox[]): Node[] {
+function toFlowNodes(
+  graphNodes: GraphNode[],
+  groups: GroupBox[],
+  newIds?: Set<string>,
+): Node[] {
   const groupNodes: Node[] = groups.map((g) => ({
     id: `group-${g.documentId}`,
     type: 'documentGroup',
     position: { x: g.x, y: g.y },
-    data: { label: g.filename, width: g.width, height: g.height },
+    data: { label: g.filename, summary: g.summary, width: g.width, height: g.height },
     selectable: false,
     draggable: false,
     style: { zIndex: -1 },
   }));
 
-  const ideaNodes: Node[] = graphNodes.map((n) => ({
-    id: n.id,
-    type: 'idea',
-    position: n.position,
-    data: {
-      label: n.label,
-      summary: n.summary,
-      tags: n.tags,
-      sources: n.sources,
-    },
-  }));
+  let newIndex = 0;
+  const ideaNodes: Node[] = graphNodes.map((n) => {
+    const isNew = newIds?.has(n.id) ?? false;
+    const node: Node = {
+      id: n.id,
+      type: 'idea',
+      position: n.position,
+      data: {
+        label: n.label,
+        summary: n.summary,
+        tags: n.tags,
+        sources: n.sources,
+        isNew,
+      },
+    };
+    if (isNew) {
+      node.style = { animationDelay: `${newIndex * 60}ms` };
+      newIndex++;
+    }
+    return node;
+  });
 
   return [...groupNodes, ...ideaNodes];
 }
@@ -139,6 +153,10 @@ export function GraphCanvas({
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
   const flowInstanceRef = useRef<ReactFlowInstance | null>(null);
 
+  // Track known node IDs to detect newly added nodes for entrance animation
+  const knownNodeIdsRef = useRef<Set<string>>(new Set());
+  const initialLoadRef = useRef(true);
+
   // Reactive graph data from Convex
   const graphData = useQuery(api.graph.get, { projectId });
 
@@ -146,7 +164,15 @@ export function GraphCanvas({
   const computed = useMemo(() => {
     if (!graphData) return null;
 
-    const { positions, groups } = computeLayout(graphData.nodes, graphData.edges);
+    // Build summaries map from document data
+    const docSummaries = new Map<string, string>();
+    if (graphData.documents) {
+      for (const doc of graphData.documents) {
+        if (doc.summary) docSummaries.set(doc.id, doc.summary);
+      }
+    }
+
+    const { positions, groups } = computeLayout(graphData.nodes, graphData.edges, docSummaries);
 
     // Resolve group filenames from node sources
     const docFilenames = new Map<string, string>();
@@ -191,7 +217,53 @@ export function GraphCanvas({
       edgeTypes: [...new Set(computed.edges.map((e) => e.type))],
     });
 
-    applyFiltersAndSet(computed.nodes, computed.edges, computed.groups);
+    // Detect newly added nodes (skip animation on initial load)
+    const currentIds = new Set(computed.nodes.map((n) => n.id));
+    let newIds: Set<string> | undefined;
+
+    if (initialLoadRef.current) {
+      initialLoadRef.current = false;
+    } else {
+      newIds = new Set<string>();
+      for (const id of currentIds) {
+        if (!knownNodeIdsRef.current.has(id)) {
+          newIds.add(id);
+        }
+      }
+      if (newIds.size === 0) newIds = undefined;
+    }
+
+    // Update known IDs
+    knownNodeIdsRef.current = currentIds;
+
+    applyFiltersAndSet(computed.nodes, computed.edges, computed.groups, newIds);
+
+    // After animation completes, clear isNew flags and fit viewport
+    if (newIds && newIds.size > 0) {
+      const totalDuration = newIds.size * 60 + 500;
+      const timer = setTimeout(() => {
+        setNodes((prev) =>
+          prev.map((n) =>
+            n.data?.isNew
+              ? { ...n, data: { ...n.data, isNew: false }, style: { ...n.style, animationDelay: undefined } }
+              : n,
+          ),
+        );
+      }, totalDuration);
+
+      const fitTimer = setTimeout(() => {
+        flowInstanceRef.current?.fitView({
+          padding: 0.1,
+          maxZoom: 1,
+          duration: 400,
+        });
+      }, newIds.size * 60 + 300);
+
+      return () => {
+        clearTimeout(timer);
+        clearTimeout(fitTimer);
+      };
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [computed]);
 
@@ -207,9 +279,10 @@ export function GraphCanvas({
   function applyFiltersAndSet(
     rawNodes: GraphNode[],
     rawEdges: GraphEdge[],
-    groups: GroupBox[]
+    groups: GroupBox[],
+    newIds?: Set<string>,
   ) {
-    const { flowNodes, flowEdges } = buildFilteredFlow(rawNodes, rawEdges, groups);
+    const { flowNodes, flowEdges } = buildFilteredFlow(rawNodes, rawEdges, groups, newIds);
     filteredFlowRef.current = { nodes: flowNodes, edges: flowEdges };
 
     if (focusedNodeId) {
@@ -223,7 +296,8 @@ export function GraphCanvas({
   function buildFilteredFlow(
     rawNodes: GraphNode[],
     rawEdges: GraphEdge[],
-    groups: GroupBox[]
+    groups: GroupBox[],
+    newIds?: Set<string>,
   ) {
     let filteredNodes = rawNodes;
     let filteredEdges = rawEdges;
@@ -251,7 +325,7 @@ export function GraphCanvas({
     }
 
     return {
-      flowNodes: toFlowNodes(filteredNodes, groups),
+      flowNodes: toFlowNodes(filteredNodes, groups, newIds),
       flowEdges: toFlowEdges(filteredEdges),
     };
   }
@@ -282,9 +356,21 @@ export function GraphCanvas({
           const connected =
             (edge.source === nodeId && neighborIds.has(edge.target)) ||
             (edge.target === nodeId && neighborIds.has(edge.source));
+          // flowToSource = true → particles travel target → source (reversed path).
+          // Default: particles flow toward the focused node.
+          // For "extends" edges, reverse the semantic direction — the base idea
+          // flows into the extension, so particles should move the other way.
+          const relType = (edge.data as Record<string, unknown> | undefined)?.relType as string | undefined;
+          let flowToSource = connected && edge.source === nodeId;
+          if (connected && relType === 'extends') flowToSource = !flowToSource;
           return {
             ...edge,
-            data: { ...edge.data, showLabel: connected },
+            data: {
+              ...edge.data,
+              showLabel: connected,
+              animated: connected,
+              flowToSource,
+            },
             style: {
               ...edge.style,
               opacity: connected ? 1 : 0.03,
@@ -314,7 +400,7 @@ export function GraphCanvas({
     setEdges(
       baseEdges.map((e) => ({
         ...e,
-        data: { ...e.data, showLabel: false },
+        data: { ...e.data, showLabel: false, animated: false, flowToSource: false },
         style: { ...e.style, opacity: undefined, transition: 'opacity 0.2s ease' },
       })),
     );

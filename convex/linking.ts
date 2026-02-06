@@ -67,13 +67,20 @@ export const saveEmbeddings = internalMutation({
 });
 
 export const deleteNode = internalMutation({
-  args: { id: v.id("nodes") },
-  handler: async (ctx, { id }) => {
+  args: { id: v.id("nodes"), mergeIntoId: v.optional(v.id("nodes")) },
+  handler: async (ctx, { id, mergeIntoId }) => {
     const refs = await ctx.db
       .query("evidenceRefs")
       .withIndex("by_node", (q) => q.eq("nodeId", id))
       .collect();
-    for (const ref of refs) await ctx.db.delete(ref._id);
+    if (mergeIntoId) {
+      // Reassign evidence refs to the surviving node instead of deleting them
+      for (const ref of refs) {
+        await ctx.db.patch(ref._id, { nodeId: mergeIntoId });
+      }
+    } else {
+      for (const ref of refs) await ctx.db.delete(ref._id);
+    }
     await ctx.db.delete(id);
   },
 });

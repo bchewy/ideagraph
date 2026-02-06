@@ -13,6 +13,8 @@ type RelationshipEdgeData = {
   relType: string;
   confidence: number;
   showLabel?: boolean;
+  animated?: boolean;
+  flowToSource?: boolean;
   reasoning?: string;
   evidence: { documentId: string; filename: string; excerpt: string }[];
 };
@@ -34,6 +36,26 @@ function formatLabel(relType: string | undefined): string {
   if (!relType) return '';
   return relType.replace(/_/g, ' ');
 }
+
+/** Reverse an SVG path's direction by swapping source ↔ target bezier params */
+function reverseBezierPath(
+  sourceX: number, sourceY: number,
+  targetX: number, targetY: number,
+  sourcePosition: EdgeProps['sourcePosition'],
+  targetPosition: EdgeProps['targetPosition'],
+): string {
+  const [reversed] = getBezierPath({
+    sourceX: targetX,
+    sourceY: targetY,
+    targetX: sourceX,
+    targetY: sourceY,
+    sourcePosition: targetPosition,
+    targetPosition: sourcePosition,
+  });
+  return reversed;
+}
+
+const PARTICLE_OFFSETS = [0, 0.33, 0.66];
 
 export function RelationshipEdge({
   id,
@@ -61,6 +83,12 @@ export function RelationshipEdge({
   const color = EDGE_COLORS[data?.relType ?? ''] ?? DEFAULT_COLOR;
   const label = formatLabel(data?.relType);
   const showLabel = hovered || data?.showLabel;
+  const animated = data?.animated ?? false;
+
+  // Path for particles: flows toward the focused node
+  const particlePath = animated && data?.flowToSource
+    ? reverseBezierPath(sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition)
+    : edgePath;
 
   return (
     <>
@@ -85,6 +113,17 @@ export function RelationshipEdge({
           transition: 'opacity 0.15s, stroke-width 0.15s',
         }}
       />
+      {/* Animated particles flowing along the edge */}
+      {animated && PARTICLE_OFFSETS.map((offset, i) => (
+        <circle key={`${id}-p${i}`} r={2.5} fill={color} opacity={0.9}>
+          <animateMotion
+            dur="2s"
+            repeatCount="indefinite"
+            begin={`${offset * 2}s`}
+            path={particlePath}
+          />
+        </circle>
+      ))}
       {showLabel && label && (
         <EdgeLabelRenderer>
           <div

@@ -2,12 +2,13 @@ import { type NodeProps } from '@xyflow/react';
 
 type DocumentGroupData = {
   label: string;
+  summary?: string;
   width: number;
   height: number;
 };
 
 export function DocumentGroup({ data }: NodeProps) {
-  const { label, width, height } = data as DocumentGroupData;
+  const { label, summary, width, height } = data as DocumentGroupData;
 
   return (
     <div
@@ -19,6 +20,13 @@ export function DocumentGroup({ data }: NodeProps) {
           {label}
         </span>
       </div>
+      {summary && (
+        <div className="px-5 py-3 overflow-hidden" style={{ maxHeight: 108 }}>
+          <p className="text-[10.5px] leading-[1.6] text-white/30 line-clamp-5">
+            {summary}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

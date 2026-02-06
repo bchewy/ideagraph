@@ -87,7 +87,10 @@ export const saveIdeas = internalMutation({
       value.replace(/\s+/g, " ").trim();
     const minLength = 40;
     const maxLength = 500;
+    const MIN_IDEA_CONFIDENCE = 0.5;
     for (const idea of ideas) {
+      // Skip low-confidence ideas — they're usually noise
+      if (idea.confidence < MIN_IDEA_CONFIDENCE) continue;
       const nodeId = await ctx.db.insert("nodes", {
         projectId,
         label: idea.label,
@@ -96,6 +99,7 @@ export const saveIdeas = internalMutation({
         confidence: idea.confidence,
       });
       const seen = new Set<string>();
+      let evidenceCount = 0;
       for (let index = 0; index < idea.excerpts.length; index++) {
         const excerpt = idea.excerpts[index];
         const normalized = normalizeExcerpt(excerpt);
@@ -112,6 +116,12 @@ export const saveIdeas = internalMutation({
           excerpt: normalized,
           ...(locator ? { locator } : {}),
         });
+        evidenceCount++;
+      }
+      // Remove nodes with no valid evidence — they can't be attributed to a document
+      if (evidenceCount === 0) {
+        await ctx.db.delete(nodeId);
+        continue;
       }
     }
   },
