@@ -1,4 +1,4 @@
-# IdeaGraph
+
 
 IdeaGraph is a knowledge graph app that extracts ideas from PDFs using OpenAI and visualizes them as an interactive graph with evidence attribution.
 
