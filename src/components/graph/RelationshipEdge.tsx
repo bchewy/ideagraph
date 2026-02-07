@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -19,7 +19,7 @@ type RelationshipEdgeData = {
   evidence: { documentId: string; filename: string; excerpt: string }[];
 };
 
-type RelationshipEdge = Edge<RelationshipEdgeData, 'relationship'>;
+type RelationshipEdgeType = Edge<RelationshipEdgeData, 'relationship'>;
 
 const EDGE_COLORS: Record<string, string> = {
   supports: '#4ade80',
@@ -57,7 +57,7 @@ function reverseBezierPath(
 
 const PARTICLE_OFFSETS = [0, 0.33, 0.66];
 
-export function RelationshipEdge({
+export const RelationshipEdge = memo(function RelationshipEdge({
   id,
   sourceX,
   sourceY,
@@ -68,7 +68,7 @@ export function RelationshipEdge({
   data,
   markerEnd,
   style,
-}: EdgeProps<RelationshipEdge>) {
+}: EdgeProps<RelationshipEdgeType>) {
   const [hovered, setHovered] = useState(false);
 
   const [edgePath, labelX, labelY] = getBezierPath({
@@ -106,6 +106,8 @@ export function RelationshipEdge({
         id={id}
         path={edgePath}
         markerEnd={markerEnd}
+        // We render a custom wide hit area above; disable BaseEdge's built-in interaction path.
+        interactionWidth={0}
         style={{
           ...style,
           stroke: color,
@@ -140,4 +142,4 @@ export function RelationshipEdge({
       )}
     </>
   );
-}
+});

@@ -6,14 +6,22 @@ export default defineSchema({
     name: v.string(),
   }),
 
+  documentFolders: defineTable({
+    projectId: v.id("projects"),
+    name: v.string(),
+  }).index("by_project", ["projectId"]),
+
   documents: defineTable({
     projectId: v.id("projects"),
+    folderId: v.optional(v.nullable(v.id("documentFolders"))),
     filename: v.string(),
     openaiFileId: v.optional(v.string()),
     status: v.string(),
     sizeBytes: v.number(),
     summary: v.optional(v.string()),
-  }).index("by_project", ["projectId"]),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_folder", ["projectId", "folderId"]),
 
   nodes: defineTable({
     projectId: v.id("projects"),

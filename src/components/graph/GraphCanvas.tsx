@@ -61,23 +61,36 @@ function toFlowNodes(
   groups: GroupBox[],
   newIds?: Set<string>,
 ): Node[] {
+  const groupByDocId = new Map<string, GroupBox>();
+  for (const g of groups) groupByDocId.set(g.documentId, g);
+
   const groupNodes: Node[] = groups.map((g) => ({
     id: `group-${g.documentId}`,
     type: 'documentGroup',
     position: { x: g.x, y: g.y },
     data: { label: g.filename, summary: g.summary, width: g.width, height: g.height },
     selectable: false,
-    draggable: false,
-    style: { zIndex: -1 },
+    draggable: true,
+    dragHandle: '.doc-group__drag',
+    // Let edges stay interactive even when they pass "under" the group rectangle.
+    // The header remains draggable via the dragHandle selector.
+    style: { pointerEvents: 'none' },
   }));
 
   let newIndex = 0;
   const ideaNodes: Node[] = graphNodes.map((n) => {
     const isNew = newIds?.has(n.id) ?? false;
+    const docId = n.sources?.[0]?.documentId ?? '__ungrouped';
+    const group = groupByDocId.get(docId) ?? groupByDocId.get('__ungrouped');
+    const parentId = group ? `group-${group.documentId}` : undefined;
+    const position = group
+      ? { x: n.position.x - group.x, y: n.position.y - group.y }
+      : n.position;
     const node: Node = {
       id: n.id,
       type: 'idea',
-      position: n.position,
+      position,
+      ...(parentId ? { parentId, extent: 'parent' as const } : {}),
       data: {
         label: n.label,
         summary: n.summary,
@@ -104,6 +117,9 @@ function toFlowEdges(graphEdges: GraphEdge[]): Edge[] {
     source: e.source,
     target: e.target,
     type: 'relationship',
+    // Parent/child nodes cause React Flow to elevate edges into the node z-index band.
+    // Keep edges behind document groups so group headers/summaries stay readable.
+    zIndex: -1,
     style: { opacity: 0.6 },
     data: {
       relType: e.type,
@@ -152,6 +168,12 @@ export function GraphCanvas({
   const [search, setSearch] = useState('');
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
   const flowInstanceRef = useRef<ReactFlowInstance | null>(null);
+
+  const ideaNodeCount = useMemo(
+    () => nodes.reduce((acc, n) => (n.type === 'idea' ? acc + 1 : acc), 0),
+    [nodes],
+  );
+  const isLargeGraph = ideaNodeCount > 200 || edges.length > 450;
 
   // Track known node IDs to detect newly added nodes for entrance animation
   const knownNodeIdsRef = useRef<Set<string>>(new Set());
@@ -254,6 +276,7 @@ export function GraphCanvas({
       const fitTimer = setTimeout(() => {
         flowInstanceRef.current?.fitView({
           padding: 0.1,
+          minZoom: 0.05,
           maxZoom: 1,
           duration: 400,
         });
@@ -401,7 +424,7 @@ export function GraphCanvas({
       baseEdges.map((e) => ({
         ...e,
         data: { ...e.data, showLabel: false, animated: false, flowToSource: false },
-        style: { ...e.style, opacity: undefined, transition: 'opacity 0.2s ease' },
+        style: { ...e.style, transition: 'opacity 0.2s ease' },
       })),
     );
   }, [setNodes, setEdges]);
@@ -430,19 +453,31 @@ export function GraphCanvas({
     if (focusedNodeId) return;
     const query = search.trim().toLowerCase();
 
+    // When search is cleared, restore default opacities without resetting positions.
+    if (query === '') {
+      setNodes((currentNodes) =>
+        currentNodes.map((node) => {
+          if (node.type === 'documentGroup') return node;
+          return { ...node, style: { ...node.style, opacity: 1 } };
+        }),
+      );
+      setEdges((currentEdges) =>
+        currentEdges.map((edge) => ({ ...edge, style: { ...edge.style, opacity: 0.6 } })),
+      );
+      return;
+    }
+
     setNodes((currentNodes) => {
       const matchingIds = new Set(
-        query === ''
-          ? currentNodes.filter((n) => n.type === 'idea').map((n) => n.id)
-          : currentNodes
-              .filter((n) => n.type === 'idea' && nodeMatchesSearch(n.data as Record<string, unknown>, query))
-              .map((n) => n.id),
+        currentNodes
+          .filter((n) => n.type === 'idea' && nodeMatchesSearch(n.data as Record<string, unknown>, query))
+          .map((n) => n.id),
       );
 
       setEdges((currentEdges) =>
         currentEdges.map((edge) => {
           const connected = matchingIds.has(edge.source) && matchingIds.has(edge.target);
-          return { ...edge, style: { ...edge.style, opacity: connected ? undefined : 0.05 } };
+          return { ...edge, style: { ...edge.style, opacity: connected ? 0.8 : 0.05 } };
         }),
       );
 
@@ -464,7 +499,7 @@ export function GraphCanvas({
     setFocusedNodeId(null);
     setNodes(flowNodes);
     setEdges(flowEdges);
-    flowInstanceRef.current?.fitView({ padding: 0.1, maxZoom: 1 });
+    flowInstanceRef.current?.fitView({ padding: 0.1, minZoom: 0.05, maxZoom: 1 });
   }
 
   if (graphData === undefined) {
@@ -518,6 +553,15 @@ export function GraphCanvas({
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        minZoom={0.05}
+        // Perf: disable interactions we don't use (edges/nodes are computed, not edited).
+        onlyRenderVisibleElements
+        nodesDraggable={false}
+        nodesConnectable={false}
+        nodesFocusable={false}
+        edgesFocusable={false}
+        edgesReconnectable={false}
+        elementsSelectable={false}
         onNodeClick={(_event, node) => {
           if (node.type === 'documentGroup') return;
           const d = node.data as Record<string, unknown>;
@@ -577,13 +621,15 @@ export function GraphCanvas({
           flowInstanceRef.current = instance;
         }}
         fitView
-        fitViewOptions={{ padding: 0.1, maxZoom: 1 }}
+        fitViewOptions={{ padding: 0.1, minZoom: 0.05, maxZoom: 1 }}
       >
         <Controls showInteractive={false} />
-        <MiniMap
-          nodeColor="#1a1a1a"
-          maskColor="rgba(0, 0, 0, 0.7)"
-        />
+        {!isLargeGraph && (
+          <MiniMap
+            nodeColor="#1a1a1a"
+            maskColor="rgba(0, 0, 0, 0.7)"
+          />
+        )}
         <Background color="#141414" />
       </ReactFlow>
     </div>

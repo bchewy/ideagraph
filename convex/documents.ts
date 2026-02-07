@@ -64,3 +64,25 @@ export const updateStatus = internalMutation({
     await ctx.db.patch(id, { status });
   },
 });
+
+export const setFolder = mutation({
+  args: {
+    id: v.id("documents"),
+    folderId: v.nullable(v.id("documentFolders")),
+  },
+  handler: async (ctx, { id, folderId }) => {
+    await ctx.db.patch(id, { folderId });
+  },
+});
+
+export const bulkSetFolder = mutation({
+  args: {
+    documentIds: v.array(v.id("documents")),
+    folderId: v.nullable(v.id("documentFolders")),
+  },
+  handler: async (ctx, { documentIds, folderId }) => {
+    for (const id of documentIds) {
+      await ctx.db.patch(id, { folderId });
+    }
+  },
+});

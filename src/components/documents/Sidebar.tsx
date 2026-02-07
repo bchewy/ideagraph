@@ -18,6 +18,7 @@ const TOOLTIP_CLASSNAME =
 
 export function Sidebar({ projectId }: { projectId: Id<"projects"> }) {
   const documents = useQuery(api.documents.list, { projectId });
+  const folders = useQuery(api.folders.list, { projectId });
   const startExtraction = useMutation(api.extraction.start);
   const startLinkingMutation = useMutation(api.linking.start);
 
@@ -134,7 +135,11 @@ export function Sidebar({ projectId }: { projectId: Id<"projects"> }) {
         <UploadDropzone projectId={projectId} />
       </div>
       <div className="mt-4">
-        <DocumentList documents={documents ?? []} />
+        <DocumentList
+          projectId={projectId}
+          documents={documents ?? []}
+          folders={folders ?? []}
+        />
       </div>
 
       {/* Extract button */}

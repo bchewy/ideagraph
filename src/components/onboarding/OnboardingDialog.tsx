@@ -133,10 +133,11 @@ function OnboardingOverlay({ onClose }: { onClose: () => void }) {
   }, [step.target]);
 
   useEffect(() => {
-    measure();
+    const raf = window.requestAnimationFrame(measure);
     const id = setInterval(measure, 300);
     window.addEventListener('resize', measure);
     return () => {
+      window.cancelAnimationFrame(raf);
       clearInterval(id);
       window.removeEventListener('resize', measure);
     };
@@ -272,9 +273,6 @@ function OnboardingOverlay({ onClose }: { onClose: () => void }) {
 
 export function OnboardingButton() {
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
 
   return (
     <>
@@ -287,7 +285,7 @@ export function OnboardingButton() {
         <HelpCircle className="size-3.5" />
         Quick Tour
       </Button>
-      {mounted && open && <OnboardingOverlay onClose={() => setOpen(false)} />}
+      {open && <OnboardingOverlay onClose={() => setOpen(false)} />}
     </>
   );
 }

@@ -11,6 +11,7 @@
 import type * as documents from "../documents.js";
 import type * as extraction from "../extraction.js";
 import type * as extractionAction from "../extractionAction.js";
+import type * as folders from "../folders.js";
 import type * as graph from "../graph.js";
 import type * as jobs from "../jobs.js";
 import type * as linking from "../linking.js";
@@ -27,6 +28,7 @@ declare const fullApi: ApiFromModules<{
   documents: typeof documents;
   extraction: typeof extraction;
   extractionAction: typeof extractionAction;
+  folders: typeof folders;
   graph: typeof graph;
   jobs: typeof jobs;
   linking: typeof linking;

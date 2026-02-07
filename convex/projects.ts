@@ -114,6 +114,16 @@ export const deleteBatch = internalMutation({
       return true;
     }
 
+    // 3.5. Document folders (200 at a time)
+    const folders = await ctx.db
+      .query("documentFolders")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .take(200);
+    if (folders.length > 0) {
+      for (const folder of folders) await ctx.db.delete(folder._id);
+      return true;
+    }
+
     // 4. Jobs (200 at a time)
     const jobs = await ctx.db
       .query("jobs")

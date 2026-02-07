@@ -141,23 +141,23 @@ async function findExcerptInPdf(
 
 // ── Component ───────────────────────────────────────────────────────────
 
-export function PdfEvidenceModal({
-  open,
-  onOpenChange,
+function PdfEvidenceModalContent({
   title,
   excerpt,
   fileUrl,
   locator,
-}: PdfEvidenceModalProps) {
+}: Omit<PdfEvidenceModalProps, 'open' | 'onOpenChange'>) {
   const [numPages, setNumPages] = useState<number | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(locator?.page ?? 1);
   const [containerWidth, setContainerWidth] = useState(600);
   const [pageNativeWidth, setPageNativeWidth] = useState(612);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [activeLocator, setActiveLocator] = useState<EvidenceLocator | null>(null);
+  const [foundLocator, setFoundLocator] = useState<EvidenceLocator | null>(null);
   const pdfRef = useRef<pdfjs.PDFDocumentProxy | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const highlightRef = useRef<HTMLDivElement | null>(null);
+
+  const activeLocator = locator ?? foundLocator;
 
   const renderWidth = Math.max(300, containerWidth - 48);
   const scale = pageNativeWidth > 0 ? renderWidth / pageNativeWidth : 1;
@@ -173,26 +173,10 @@ export function PdfEvidenceModal({
     return () => ro.disconnect();
   }, []);
 
-  // Reset when modal opens with new content
-  useEffect(() => {
-    if (open) {
-      setLoadError(null);
-      setActiveLocator(null);
-      setNumPages(null);
-      pdfRef.current = null;
-    }
-  }, [open, fileUrl, excerpt]);
-
   // ── Core: find excerpt and navigate ──
   useEffect(() => {
-    if (!open) return;
-
     // Pre-computed locator from DB
-    if (locator) {
-      setActiveLocator(locator);
-      setCurrentPage(locator.page);
-      return;
-    }
+    if (locator) return;
 
     const pdf = pdfRef.current;
     if (!pdf || !excerpt) return;
@@ -202,7 +186,7 @@ export function PdfEvidenceModal({
       .then((found) => {
         if (cancelled) return;
         if (found) {
-          setActiveLocator(found);
+          setFoundLocator(found);
           setCurrentPage(found.page);
         } else {
           setCurrentPage(1);
@@ -213,16 +197,16 @@ export function PdfEvidenceModal({
       });
 
     return () => { cancelled = true; };
-  }, [open, locator, excerpt, numPages]);
+  }, [locator, excerpt, numPages]);
 
   // Scroll highlight into view
   useEffect(() => {
-    if (!open || !activeLocator || currentPage !== activeLocator.page) return;
+    if (!activeLocator || currentPage !== activeLocator.page) return;
     const timeout = setTimeout(() => {
       highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 600);
     return () => clearTimeout(timeout);
-  }, [open, activeLocator, currentPage]);
+  }, [activeLocator, currentPage]);
 
   const highlightBoxes = useMemo(() => {
     if (!activeLocator || currentPage !== activeLocator.page) return [];
@@ -233,7 +217,7 @@ export function PdfEvidenceModal({
       height: `${box.height * scale}px`,
     }));
     return boxes;
-  }, [activeLocator, scale, currentPage, pageNativeWidth, renderWidth]);
+  }, [activeLocator, scale, currentPage]);
 
   const onPageRenderSuccess = useCallback(
     (page: { originalWidth?: number; width: number; height: number }) => {
@@ -253,106 +237,131 @@ export function PdfEvidenceModal({
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        showCloseButton={false}
-        className="max-w-4xl w-[92vw] h-[85vh] p-0 overflow-hidden flex flex-col"
-      >
-        <DialogHeader className="shrink-0 border-b px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <DialogTitle className="text-sm font-semibold truncate">
-              {title}
-            </DialogTitle>
-            {numPages && numPages > 1 && (
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage <= 1}
-                  className="px-2 py-0.5 text-xs rounded border border-border hover:bg-muted disabled:opacity-30 disabled:cursor-default"
-                >
-                  ‹
-                </button>
-                <span className="text-xs text-muted-foreground tabular-nums min-w-[4rem] text-center">
-                  {currentPage} / {numPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
-                  disabled={currentPage >= numPages}
-                  className="px-2 py-0.5 text-xs rounded border border-border hover:bg-muted disabled:opacity-30 disabled:cursor-default"
-                >
-                  ›
-                </button>
-                {activeLocator && currentPage !== activeLocator.page && (
-                  <button
-                    onClick={() => setCurrentPage(activeLocator.page)}
-                    className="ml-1 px-2 py-0.5 text-xs rounded border border-primary/40 text-primary hover:bg-primary/10"
-                  >
-                    Go to highlight
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-          {excerpt ? (
-            <DialogDescription className="text-xs italic leading-relaxed line-clamp-2 mt-1">
-              &ldquo;{excerpt}&rdquo;
-            </DialogDescription>
-          ) : (
-            <DialogDescription className="sr-only">
-              PDF evidence viewer
-            </DialogDescription>
-          )}
-        </DialogHeader>
-
-        <div
-          ref={containerRef}
-          className="flex-1 min-h-0 overflow-auto bg-muted/30"
-        >
-          <div className="flex justify-center px-6 py-4">
-            {fileUrl ? (
-              <Document
-                file={fileUrl}
-                loading={
-                  <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
-                    Loading PDF…
-                  </div>
-                }
-                error={
-                  <div className="flex items-center justify-center py-20 text-sm text-red-400">
-                    {loadError ?? 'Failed to load PDF.'}
-                  </div>
-                }
-                onLoadSuccess={onDocumentLoadSuccess}
-                onLoadError={(error) => {
-                  console.error('[PdfEvidence] Load error:', error);
-                  setLoadError(error?.message ?? 'Failed to load PDF');
-                }}
+    <DialogContent
+      showCloseButton={false}
+      className="max-w-4xl w-[92vw] h-[85vh] p-0 overflow-hidden flex flex-col"
+    >
+      <DialogHeader className="shrink-0 border-b px-4 py-3">
+        <div className="flex items-center justify-between gap-4">
+          <DialogTitle className="text-sm font-semibold truncate">
+            {title}
+          </DialogTitle>
+          {numPages && numPages > 1 && (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                className="px-2 py-0.5 text-xs rounded border border-border hover:bg-muted disabled:opacity-30 disabled:cursor-default"
               >
-                <div className="relative inline-block">
-                  <Page
-                    pageNumber={currentPage}
-                    width={renderWidth}
-                    renderAnnotationLayer={false}
-                    onRenderSuccess={onPageRenderSuccess}
-                  />
-                  {highlightBoxes.map((style, index) => (
-                    <div
-                      key={index}
-                      ref={index === 0 ? highlightRef : undefined}
-                      className="absolute z-10 rounded-sm bg-yellow-300/40 pointer-events-none"
-                      style={style}
-                    />
-                  ))}
-                </div>
-              </Document>
-            ) : (
-              <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
-                No PDF file available.
-              </div>
-            )}
-          </div>
+                ‹
+              </button>
+              <span className="text-xs text-muted-foreground tabular-nums min-w-[4rem] text-center">
+                {currentPage} / {numPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
+                disabled={currentPage >= numPages}
+                className="px-2 py-0.5 text-xs rounded border border-border hover:bg-muted disabled:opacity-30 disabled:cursor-default"
+              >
+                ›
+              </button>
+              {activeLocator && currentPage !== activeLocator.page && (
+                <button
+                  onClick={() => setCurrentPage(activeLocator.page)}
+                  className="ml-1 px-2 py-0.5 text-xs rounded border border-primary/40 text-primary hover:bg-primary/10"
+                >
+                  Go to highlight
+                </button>
+              )}
+            </div>
+          )}
         </div>
-      </DialogContent>
+        {excerpt ? (
+          <DialogDescription className="text-xs italic leading-relaxed line-clamp-2 mt-1">
+            &ldquo;{excerpt}&rdquo;
+          </DialogDescription>
+        ) : (
+          <DialogDescription className="sr-only">
+            PDF evidence viewer
+          </DialogDescription>
+        )}
+      </DialogHeader>
+
+      <div
+        ref={containerRef}
+        className="flex-1 min-h-0 overflow-auto bg-muted/30"
+      >
+        <div className="flex justify-center px-6 py-4">
+          {fileUrl ? (
+            <Document
+              file={fileUrl}
+              loading={
+                <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
+                  Loading PDF…
+                </div>
+              }
+              error={
+                <div className="flex items-center justify-center py-20 text-sm text-red-400">
+                  {loadError ?? 'Failed to load PDF.'}
+                </div>
+              }
+              onLoadSuccess={onDocumentLoadSuccess}
+              onLoadError={(error) => {
+                console.error('[PdfEvidence] Load error:', error);
+                setLoadError(error?.message ?? 'Failed to load PDF');
+              }}
+            >
+              <div className="relative inline-block">
+                <Page
+                  pageNumber={currentPage}
+                  width={renderWidth}
+                  renderAnnotationLayer={false}
+                  onRenderSuccess={onPageRenderSuccess}
+                />
+                {highlightBoxes.map((style, index) => (
+                  <div
+                    key={index}
+                    ref={index === 0 ? highlightRef : undefined}
+                    className="absolute z-10 rounded-sm bg-yellow-300/40 pointer-events-none"
+                    style={style}
+                  />
+                ))}
+              </div>
+            </Document>
+          ) : (
+            <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
+              No PDF file available.
+            </div>
+          )}
+        </div>
+      </div>
+    </DialogContent>
+  );
+}
+
+export function PdfEvidenceModal({
+  open,
+  onOpenChange,
+  title,
+  excerpt,
+  fileUrl,
+  locator,
+}: PdfEvidenceModalProps) {
+  const contentKey = `${fileUrl ?? 'no-file'}|${excerpt}|${
+    locator ? `loc:${locator.page}` : 'search'
+  }`;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {open && (
+        <PdfEvidenceModalContent
+          key={contentKey}
+          title={title}
+          excerpt={excerpt}
+          fileUrl={fileUrl}
+          locator={locator}
+        />
+      )}
     </Dialog>
   );
 }

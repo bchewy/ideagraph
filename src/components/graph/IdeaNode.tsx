@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { cn } from '@/lib/utils';
 
@@ -9,7 +10,7 @@ type IdeaNodeData = {
   isNew?: boolean;
 };
 
-export function IdeaNode({ data }: NodeProps) {
+export const IdeaNode = memo(function IdeaNode({ data }: NodeProps) {
   const { label, tags, isNew } = data as IdeaNodeData;
 
   return (
@@ -21,7 +22,7 @@ export function IdeaNode({ data }: NodeProps) {
       />
       <div
         className={cn(
-          'w-[200px] rounded border border-white/[0.08] bg-[#0c0c0c] px-3 py-2 transition-colors hover:border-white/20',
+          'w-[200px] rounded border border-zinc-200/[0.22] bg-zinc-200/[0.12] px-3 py-2 backdrop-blur-sm shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_10px_30px_rgba(0,0,0,0.55)] transition-colors hover:border-zinc-200/[0.30]',
           isNew && 'animate-node-enter',
         )}
       >
@@ -41,4 +42,4 @@ export function IdeaNode({ data }: NodeProps) {
       />
     </>
   );
-}
+});

@@ -45,6 +45,176 @@ const MIN_WIDTH = 280;
 const MAX_WIDTH = 600;
 const DEFAULT_WIDTH = 320;
 
+function ConnectionsSection({ linked }: { linked: LinkedNode[] }) {
+  // Connection filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedRelTypes, setSelectedRelTypes] = useState<Set<string>>(
+    new Set()
+  );
+  const [minConfidence, setMinConfidence] = useState(0);
+
+  // Gather unique rel types present in this node's connections
+  const availableRelTypes = useMemo(
+    () => Array.from(new Set(linked.map((l) => l.relType))),
+    [linked]
+  );
+
+  const filteredLinked = useMemo(() => {
+    return linked.filter((l) => {
+      if (selectedRelTypes.size > 0 && !selectedRelTypes.has(l.relType))
+        return false;
+      if (Math.round(l.confidence * 100) < minConfidence) return false;
+      return true;
+    });
+  }, [linked, selectedRelTypes, minConfidence]);
+
+  function toggleRelType(relType: string) {
+    setSelectedRelTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(relType)) next.delete(relType);
+      else next.add(relType);
+      return next;
+    });
+  }
+
+  const hasActiveFilters = selectedRelTypes.size > 0 || minConfidence > 0;
+
+  return (
+    <section>
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+          Connections
+          {hasActiveFilters
+            ? ` (${filteredLinked.length}/${linked.length})`
+            : ` (${linked.length})`}
+        </h3>
+        <button
+          type="button"
+          onClick={() => setShowFilters((v) => !v)}
+          className={`p-1 rounded transition-colors ${
+            showFilters || hasActiveFilters
+              ? 'text-primary bg-primary/10'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+          title="Filter connections"
+        >
+          <SlidersHorizontal className="size-3" />
+        </button>
+      </div>
+
+      {/* Inline filter controls */}
+      {showFilters && (
+        <div className="mb-3 rounded border border-border bg-muted/30 p-2.5 flex flex-col gap-2.5">
+          {/* Relationship type pills */}
+          <div>
+            <p className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+              Type
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {availableRelTypes.map((rt) => {
+                const active =
+                  selectedRelTypes.size === 0 || selectedRelTypes.has(rt);
+                const color = REL_COLORS[rt] ?? '#666';
+                return (
+                  <button
+                    key={rt}
+                    type="button"
+                    onClick={() => toggleRelType(rt)}
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium border transition-colors ${
+                      active
+                        ? 'border-border bg-background text-foreground'
+                        : 'border-transparent bg-muted/50 text-muted-foreground/50'
+                    }`}
+                  >
+                    <span
+                      className="size-1.5 rounded-full shrink-0"
+                      style={{
+                        backgroundColor: color,
+                        opacity: active ? 1 : 0.35,
+                      }}
+                    />
+                    {REL_LABELS[rt] ?? rt}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Min confidence slider */}
+          <div>
+            <p className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
+              Min Confidence
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={minConfidence}
+                onChange={(e) => setMinConfidence(Number(e.target.value))}
+                className="h-1.5 w-full cursor-pointer accent-primary"
+              />
+              <span className="w-7 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
+                {minConfidence}%
+              </span>
+            </div>
+          </div>
+
+          {/* Reset */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedRelTypes(new Set());
+                setMinConfidence(0);
+              }}
+              className="self-start text-[10px] text-primary hover:text-primary/80 transition-colors"
+            >
+              Reset filters
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Connection cards */}
+      <div className="flex flex-col gap-1.5">
+        {filteredLinked.length === 0 ? (
+          <p className="text-[10px] text-muted-foreground py-2 text-center">
+            No connections match the current filters.
+          </p>
+        ) : (
+          filteredLinked.map((link, i) => (
+            <div
+              key={i}
+              className="flex items-start gap-2 rounded border border-border px-2.5 py-2"
+            >
+              <span
+                className="mt-1 shrink-0 size-1.5 rounded-full"
+                style={{ backgroundColor: REL_COLORS[link.relType] ?? '#666' }}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-foreground leading-snug break-words whitespace-normal">
+                  {link.label}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {REL_LABELS[link.relType] ?? link.relType} ·{' '}
+                  {Math.round(link.confidence * 100)}%
+                </p>
+                {link.reasoning && (
+                  <p className="text-[10px] leading-relaxed text-foreground/60 mt-1 break-words whitespace-normal">
+                    {link.reasoning}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function NodeInspector({
   data,
   onClose,
@@ -85,46 +255,6 @@ export function NodeInspector({
   }, []);
 
   const linked = data.linkedNodes ?? [];
-
-  // Connection filters
-  const [showFilters, setShowFilters] = useState(false);
-  const [selectedRelTypes, setSelectedRelTypes] = useState<Set<string>>(new Set());
-  const [minConfidence, setMinConfidence] = useState(0);
-
-  // Gather unique rel types present in this node's connections
-  const availableRelTypes = useMemo(
-    () => Array.from(new Set(linked.map((l) => l.relType))),
-    [linked],
-  );
-
-  // Reset filters when inspected node changes
-  const prevLabel = useRef(data.label);
-  useEffect(() => {
-    if (prevLabel.current !== data.label) {
-      prevLabel.current = data.label;
-      setSelectedRelTypes(new Set());
-      setMinConfidence(0);
-    }
-  }, [data.label]);
-
-  const filteredLinked = useMemo(() => {
-    return linked.filter((l) => {
-      if (selectedRelTypes.size > 0 && !selectedRelTypes.has(l.relType)) return false;
-      if (Math.round(l.confidence * 100) < minConfidence) return false;
-      return true;
-    });
-  }, [linked, selectedRelTypes, minConfidence]);
-
-  function toggleRelType(relType: string) {
-    setSelectedRelTypes((prev) => {
-      const next = new Set(prev);
-      if (next.has(relType)) next.delete(relType);
-      else next.add(relType);
-      return next;
-    });
-  }
-
-  const hasActiveFilters = selectedRelTypes.size > 0 || minConfidence > 0;
 
   return (
     <aside
@@ -179,136 +309,10 @@ export function NodeInspector({
 
           {/* Linked ideas */}
           {linked.length > 0 && (
-            <section>
-              {/* Header row */}
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Connections
-                  {hasActiveFilters
-                    ? ` (${filteredLinked.length}/${linked.length})`
-                    : ` (${linked.length})`}
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setShowFilters((v) => !v)}
-                  className={`p-1 rounded transition-colors ${
-                    showFilters || hasActiveFilters
-                      ? 'text-primary bg-primary/10'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                  title="Filter connections"
-                >
-                  <SlidersHorizontal className="size-3" />
-                </button>
-              </div>
-
-              {/* Inline filter controls */}
-              {showFilters && (
-                <div className="mb-3 rounded border border-border bg-muted/30 p-2.5 flex flex-col gap-2.5">
-                  {/* Relationship type pills */}
-                  <div>
-                    <p className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
-                      Type
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {availableRelTypes.map((rt) => {
-                        const active = selectedRelTypes.size === 0 || selectedRelTypes.has(rt);
-                        const color = REL_COLORS[rt] ?? '#666';
-                        return (
-                          <button
-                            key={rt}
-                            type="button"
-                            onClick={() => toggleRelType(rt)}
-                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium border transition-colors ${
-                              active
-                                ? 'border-border bg-background text-foreground'
-                                : 'border-transparent bg-muted/50 text-muted-foreground/50'
-                            }`}
-                          >
-                            <span
-                              className="size-1.5 rounded-full shrink-0"
-                              style={{
-                                backgroundColor: color,
-                                opacity: active ? 1 : 0.35,
-                              }}
-                            />
-                            {REL_LABELS[rt] ?? rt}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Min confidence slider */}
-                  <div>
-                    <p className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                      Min Confidence
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={minConfidence}
-                        onChange={(e) => setMinConfidence(Number(e.target.value))}
-                        className="h-1.5 w-full cursor-pointer accent-primary"
-                      />
-                      <span className="w-7 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
-                        {minConfidence}%
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Reset */}
-                  {hasActiveFilters && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedRelTypes(new Set());
-                        setMinConfidence(0);
-                      }}
-                      className="self-start text-[10px] text-primary hover:text-primary/80 transition-colors"
-                    >
-                      Reset filters
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Connection cards */}
-              <div className="flex flex-col gap-1.5">
-                {filteredLinked.length === 0 ? (
-                  <p className="text-[10px] text-muted-foreground py-2 text-center">
-                    No connections match the current filters.
-                  </p>
-                ) : (
-                  filteredLinked.map((link, i) => (
-                    <div
-                      key={i}
-                      className="flex items-start gap-2 rounded border border-border px-2.5 py-2"
-                    >
-                      <span
-                        className="mt-1 shrink-0 size-1.5 rounded-full"
-                        style={{ backgroundColor: REL_COLORS[link.relType] ?? '#666' }}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-medium text-foreground leading-snug break-words whitespace-normal">
-                          {link.label}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {REL_LABELS[link.relType] ?? link.relType} · {Math.round(link.confidence * 100)}%
-                        </p>
-                        {link.reasoning && (
-                          <p className="text-[10px] leading-relaxed text-foreground/60 mt-1 break-words whitespace-normal">
-                            {link.reasoning}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
+            <ConnectionsSection
+              key={`${data.label}|${data.summary}`}
+              linked={linked}
+            />
           )}
 
           {/* Evidence */}
